@@ -9,6 +9,7 @@ use App\Models\Categorie;
 use App\Models\Entree;
 use App\Models\Produit;
 use App\Models\Variante;
+
 use App\Services\StockMovementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
