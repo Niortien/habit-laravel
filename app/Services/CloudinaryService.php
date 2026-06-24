@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Services;
+
+use Cloudinary\Cloudinary;
+use Cloudinary\Configuration\Configuration;
+
+class CloudinaryService
+{
+    private ?Cloudinary $cloudinary = null;
+
+    private function client(): Cloudinary
+    {
+        if ($this->cloudinary === null) {
+            Configuration::instance([
+                'cloud' => [
+                    'cloud_name' => config('cloudinary.cloud_name'),
+                    'api_key'    => config('cloudinary.api_key'),
+                    'api_secret' => config('cloudinary.api_secret'),
+                ],
+                'url'   => ['secure' => true],
+            ]);
+            $this->cloudinary = new Cloudinary();
+        }
+        return $this->cloudinary;
+    }
+
+    public function uploadFile(string $filePath, string $folder = 'produits'): string
+    {
+        $result = $this->client()->uploadApi()->upload($filePath, ['folder' => $folder, 'resource_type' => 'image']);
+        return $result['secure_url'];
+    }
+
+    public function uploadBase64(string $dataUrl, string $folder = 'produits'): string
+    {
+        $result = $this->client()->uploadApi()->upload($dataUrl, ['folder' => $folder, 'resource_type' => 'image']);
+        return $result['secure_url'];
+    }
+
+    public function deleteByUrl(string $url): void
+    {
+        if (preg_match('/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i', $url, $matches)) {
+            $this->client()->uploadApi()->destroy($matches[1]);
+        }
+    }
+}

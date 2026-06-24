@@ -1,0 +1,163 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Exceptions\ConflictException;
+use App\Exceptions\NotFoundException;
+use App\Http\Traits\ApiResponse;
+use App\Models\CaisseSession;
+use App\Models\Sortie;
+use App\Services\StockMovementService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+class SortieController extends Controller
+{
+    use ApiResponse;
+
+    public function __construct(private StockMovementService $movements) {}
+
+    private function boutiqueId(Request $request): ?string
+    {
+        $user = $request->user();
+        return $user->role === 'ADMIN' ? ($request->query('boutiqueId') ?? null) : $user->boutique_id;
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $boutiqueId = $this->boutiqueId($request);
+        $q = Sortie::with(['user', 'boutique', 'lignes.variante.produit', 'transaction'])->orderBy('created_at', 'desc');
+
+        if ($boutiqueId)             $q->where('boutique_id', $boutiqueId);
+        if ($request->filled('type'))      $q->where('type', $request->type);
+        if ($request->filled('dateDebut')) $q->where('created_at', '>=', $request->dateDebut);
+        if ($request->filled('dateFin'))   $q->where('created_at', '<=', $request->dateFin);
+
+        $page  = max(1, (int) $request->get('page', 1));
+        $limit = min(100, max(1, (int) $request->get('limit', 20)));
+        $total = $q->count();
+        $data  = $q->skip(($page - 1) * $limit)->take($limit)->get();
+
+        return $this->paginated($data, $total, $page, $limit);
+    }
+
+    public function show(string $id): JsonResponse
+    {
+        $s = Sortie::with(['user', 'boutique', 'lignes.variante.produit', 'transaction'])->find($id);
+        if (!$s) throw new NotFoundException('Sortie introuvable', 'SORTIE_NOT_FOUND');
+        return $this->success($s);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'type'          => 'required|in:VENTE,PERTE,DON,RETOUR_FOURNISSEUR',
+            'notes'         => 'sometimes|nullable|string',
+            'remiseMontant' => 'sometimes|nullable|numeric|min:0',
+            'dateOperation' => 'sometimes|nullable|date',
+            'lignes'        => 'required|array|min:1',
+            'lignes.*.varianteId'    => 'required|uuid',
+            'lignes.*.quantite'      => 'required|integer|min:1',
+            'lignes.*.prixUnitaire'  => 'required|numeric|min:0',
+        ]);
+
+        $boutiqueId = $this->boutiqueId($request);
+        $userId     = $request->user()->id;
+
+        if ($data['type'] === 'VENTE') {
+            $session = CaisseSession::where('statut', 'OUVERTE')
+                ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+                ->first();
+            if (!$session) {
+                throw new ConflictException('Aucune session de caisse ouverte', 'NO_ACTIVE_SESSION');
+            }
+        }
+
+        $totalAvant = '0.00';
+        foreach ($data['lignes'] as $l) {
+            $totalAvant = bcadd($totalAvant, bcmul((string) $l['prixUnitaire'], (string) $l['quantite'], 2), 2);
+        }
+        $remise = (string) ($data['remiseMontant'] ?? '0');
+        $totalMontant = bcsub($totalAvant, $remise, 2);
+
+        if (bccomp($totalMontant, '0', 2) < 0) {
+            throw new \App\Exceptions\ValidationException('La remise dépasse le total', 'REMISE_INVALIDE');
+        }
+
+        $reference = 'SRT-' . strtoupper(Str::random(8));
+
+        $sortie = DB::transaction(function () use ($data, $boutiqueId, $userId, $reference, $totalAvant, $remise, $totalMontant) {
+            $sortie = Sortie::create([
+                'reference'          => $reference,
+                'type'               => $data['type'],
+                'total_avant_remise' => $totalAvant,
+                'remise_montant'     => $remise,
+                'total_montant'      => $totalMontant,
+                'notes'              => $data['notes'] ?? null,
+                'user_id'            => $userId,
+                'boutique_id'        => $boutiqueId,
+            ]);
+
+            foreach ($data['lignes'] as $ligne) {
+                $sortie->lignes()->create([
+                    'variante_id'   => $ligne['varianteId'],
+                    'quantite'      => $ligne['quantite'],
+                    'prix_unitaire' => $ligne['prixUnitaire'],
+                ]);
+                $this->movements->create($ligne['varianteId'], 'SORTIE', $ligne['quantite'], $userId, null, null, $reference);
+            }
+
+            return $sortie;
+        });
+
+        return $this->success($sortie->load(['lignes.variante.produit', 'user', 'boutique', 'transaction']), 201);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $sortie = Sortie::find($id);
+        if (!$sortie) throw new NotFoundException('Sortie introuvable', 'SORTIE_NOT_FOUND');
+
+        $data = $request->validate(['notes' => 'sometimes|nullable|string']);
+        $sortie->update($data);
+        return $this->success($sortie->fresh()->load(['lignes.variante.produit', 'user', 'boutique', 'transaction']));
+    }
+
+    public function destroy(string $id): JsonResponse
+    {
+        $sortie = Sortie::with('lignes')->find($id);
+        if (!$sortie) throw new NotFoundException('Sortie introuvable', 'SORTIE_NOT_FOUND');
+
+        $userId = request()->user()->id;
+        DB::transaction(function () use ($sortie, $userId) {
+            foreach ($sortie->lignes as $ligne) {
+                $this->movements->create($ligne->variante_id, 'RETOUR', $ligne->quantite, $userId, 'Annulation sortie ' . $sortie->reference);
+            }
+            $sortie->delete();
+        });
+
+        return $this->success($sortie);
+    }
+
+    public function annuler(string $id): JsonResponse
+    {
+        $sortie = Sortie::with('lignes')->find($id);
+        if (!$sortie) throw new NotFoundException('Sortie introuvable', 'SORTIE_NOT_FOUND');
+
+        if (str_starts_with($sortie->notes ?? '', '[ANNULÉE]')) {
+            throw new ConflictException('Sortie déjà annulée', 'SORTIE_ALREADY_CANCELLED');
+        }
+
+        $userId = request()->user()->id;
+        DB::transaction(function () use ($sortie, $userId) {
+            foreach ($sortie->lignes as $ligne) {
+                $this->movements->create($ligne->variante_id, 'RETOUR', $ligne->quantite, $userId, 'Annulation sortie ' . $sortie->reference);
+            }
+            $sortie->update(['notes' => '[ANNULÉE] ' . ($sortie->notes ?? '')]);
+        });
+
+        return $this->success($sortie->fresh()->load(['lignes.variante.produit', 'user', 'boutique', 'transaction']));
+    }
+}
