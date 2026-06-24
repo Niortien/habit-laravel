@@ -15,7 +15,8 @@ use Tymon\JWTAuth\Exceptions\JWTException;
 class AuthController extends Controller
 {
     use ApiResponse;
-
+ 
+    
     /**
      * @OA\Post(
      *     path="/auth/login",
