@@ -23,7 +23,7 @@ class Handler extends ExceptionHandler
 
             if ($e instanceof DomainException) {
                 return response()->json([
-                    'error' => ['code' => $e->code, 'message' => $e->getMessage(), 'details' => $e->details],
+                    'error' => ['code' => $e->errorCode, 'message' => $e->getMessage(), 'details' => $e->details],
                     'path'  => $path,
                     'timestamp' => $ts,
                 ], $e->statusCode);

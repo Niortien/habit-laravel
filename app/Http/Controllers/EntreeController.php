@@ -27,6 +27,17 @@ class EntreeController extends Controller
         return $user->role === 'ADMIN' ? ($request->query('boutiqueId') ?? null) : $user->boutique_id;
     }
 
+    /**
+     * @OA\Get(path="/entrees", tags={"Entrées"}, summary="Liste des entrées de stock (paginée)", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="fournisseur", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer", default=1)),
+     *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer", default=20)),
+     *     @OA\Response(response=200, description="Entrées", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function index(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
@@ -52,6 +63,22 @@ class EntreeController extends Controller
         return $this->success($e);
     }
 
+    /**
+     * @OA\Post(path="/entrees", tags={"Entrées"}, summary="Créer une entrée de stock", security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"fournisseur","lignes"},
+     *             @OA\Property(property="fournisseur", type="string"),
+     *             @OA\Property(property="notes", type="string", nullable=true),
+     *             @OA\Property(property="lignes", type="array", @OA\Items(type="object",
+     *                 @OA\Property(property="varianteId", type="string", format="uuid"),
+     *                 @OA\Property(property="quantite", type="integer"),
+     *                 @OA\Property(property="prixUnitaire", type="number")
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Entrée créée", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -151,6 +178,13 @@ class EntreeController extends Controller
         return $this->success($entree);
     }
 
+    /**
+     * @OA\Patch(path="/entrees/{id}/annuler", tags={"Entrées"}, summary="Annuler une entrée (reverse les stocks)", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Annulée", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=409, description="Déjà annulée", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function annuler(string $id): JsonResponse
     {
         $entree = Entree::with('lignes')->find($id);

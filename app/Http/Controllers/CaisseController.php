@@ -21,6 +21,14 @@ class CaisseController extends Controller
         return $user->role === 'ADMIN' ? $queryBoutiqueId : $user->boutique_id;
     }
 
+    /**
+     * @OA\Get(path="/caisse/sessions", tags={"Caisse"}, summary="Liste des sessions de caisse", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Response(response=200, description="Sessions", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function listSessions(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request, $request->query('boutiqueId'));
@@ -49,6 +57,13 @@ class CaisseController extends Controller
         return $this->success($session);
     }
 
+    /**
+     * @OA\Post(path="/caisse/sessions", tags={"Caisse"}, summary="Ouvrir une session de caisse", security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(@OA\JsonContent(@OA\Property(property="montantOuverture", type="number", example=0))),
+     *     @OA\Response(response=201, description="Session ouverte", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=409, description="Session déjà ouverte", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function openSession(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -112,6 +127,21 @@ class CaisseController extends Controller
         return $this->paginated($data, $total, $page, $limit);
     }
 
+    /**
+     * @OA\Post(path="/caisse/transactions", tags={"Caisse"}, summary="Enregistrer un paiement", security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"montant","modePaiement"},
+     *             @OA\Property(property="montant", type="number"),
+     *             @OA\Property(property="modePaiement", type="string", enum={"CASH","WAVE","ORANGE_MONEY","CARTE","MTN_MONEY"}),
+     *             @OA\Property(property="sortieId", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="reference", type="string", nullable=true),
+     *             @OA\Property(property="notes", type="string", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Transaction créée", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=409, description="Pas de session ouverte", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function createTransaction(Request $request): JsonResponse
     {
         $data = $request->validate([

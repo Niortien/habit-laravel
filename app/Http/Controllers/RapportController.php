@@ -27,6 +27,15 @@ class RapportController extends Controller
         return $user->role === 'ADMIN' ? ($request->query('boutiqueId') ?? null) : $user->boutique_id;
     }
 
+    /**
+     * @OA\Get(path="/rapports/ventes", tags={"Rapports"}, summary="Ventes groupées par période", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="groupBy", in="query", @OA\Schema(type="string", enum={"jour","semaine","mois"}, default="jour")),
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Ventes par période", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function ventes(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
@@ -132,6 +141,19 @@ class RapportController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(path="/rapports/resume-dashboard", tags={"Rapports"}, summary="Résumé tableau de bord", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Dashboard",
+     *         @OA\JsonContent(@OA\Property(property="data", type="object",
+     *             @OA\Property(property="ventesAujourdhui", type="string"),
+     *             @OA\Property(property="alertesStock", type="integer"),
+     *             @OA\Property(property="produitsActifs", type="integer"),
+     *             @OA\Property(property="topProduits", type="array", @OA\Items(type="object"))
+     *         ), @OA\Property(property="meta", type="object", nullable=true), @OA\Property(property="timestamp", type="string", format="date-time"))
+     *     )
+     * )
+     */
     public function resumeDashboard(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
@@ -164,6 +186,14 @@ class RapportController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(path="/rapports/export-excel", tags={"Rapports"}, summary="Export des ventes en Excel (.xlsx)", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Fichier Excel", @OA\MediaType(mediaType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+     * )
+     */
     public function exportExcel(Request $request): mixed
     {
         $boutiqueId = $this->boutiqueId($request);
@@ -190,6 +220,14 @@ class RapportController extends Controller
         return Excel::download($export, 'rapport-ventes.xlsx');
     }
 
+    /**
+     * @OA\Get(path="/rapports/export-pdf", tags={"Rapports"}, summary="Export des ventes en PDF", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Fichier PDF", @OA\MediaType(mediaType="application/pdf"))
+     * )
+     */
     public function exportPdf(Request $request): Response
     {
         $boutiqueId = $this->boutiqueId($request);

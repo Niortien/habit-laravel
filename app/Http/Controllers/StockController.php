@@ -17,6 +17,17 @@ class StockController extends Controller
 
     public function __construct(private StockMovementService $movements) {}
 
+    /**
+     * @OA\Get(path="/stock", tags={"Stock"}, summary="État du stock (paginé)", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="categorieId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="taille", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="couleur", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer", default=1)),
+     *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer", default=20)),
+     *     @OA\Response(response=200, description="Liste des variantes avec stock", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function index(Request $request): JsonResponse
     {
         $q = Variante::with(['produit.categorie', 'boutique']);
@@ -36,6 +47,12 @@ class StockController extends Controller
         return $this->paginated($data, $total, $page, $limit);
     }
 
+    /**
+     * @OA\Get(path="/stock/alertes", tags={"Stock"}, summary="Variantes sous le seuil d'alerte", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Variantes en alerte", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function alertes(Request $request): JsonResponse
     {
         $q = Variante::with(['produit.categorie', 'boutique'])
@@ -51,6 +68,15 @@ class StockController extends Controller
         return $this->paginated($data, $total, $page, $limit);
     }
 
+    /**
+     * @OA\Get(path="/stock/mouvements", tags={"Stock"}, summary="Historique de tous les mouvements de stock", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="type", in="query", @OA\Schema(type="string", enum={"ENTREE","SORTIE","AJUSTEMENT","RETOUR"})),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Response(response=200, description="Mouvements", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function mouvements(Request $request): JsonResponse
     {
         $q = MouvementStock::with(['variante.produit', 'user'])->orderBy('created_at', 'desc');

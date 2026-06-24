@@ -14,11 +14,62 @@ class UserController extends Controller
 {
     use ApiResponse;
 
+    /**
+     * @OA\Get(
+     *     path="/users",
+     *     tags={"Utilisateurs"},
+     *     summary="Liste tous les utilisateurs (ADMIN)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Liste des utilisateurs",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/User")),
+     *             @OA\Property(property="meta", type="object", nullable=true),
+     *             @OA\Property(property="timestamp", type="string", format="date-time")
+     *         )
+     *     )
+     * )
+     */
     public function index(): JsonResponse
     {
         return $this->success(User::with('boutique')->orderBy('created_at')->get());
     }
 
+    /**
+     * @OA\Get(
+     *     path="/users/{id}",
+     *     tags={"Utilisateurs"},
+     *     summary="Détail d'un utilisateur (ADMIN)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Utilisateur trouvé", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function show(string $id): JsonResponse
+    {
+        $user = User::with('boutique')->find($id);
+        if (!$user) throw new NotFoundException('Utilisateur introuvable', 'USER_NOT_FOUND');
+        return $this->success($user);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/users",
+     *     tags={"Utilisateurs"},
+     *     summary="Créer un utilisateur (ADMIN)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"email","password"},
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="password", type="string", minLength=8),
+     *             @OA\Property(property="role", type="string", enum={"ADMIN","VENDEUR"}),
+     *             @OA\Property(property="boutiqueId", type="string", format="uuid", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Utilisateur créé", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=409, description="Email déjà utilisé", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -42,6 +93,25 @@ class UserController extends Controller
         return $this->success($user, 201);
     }
 
+    /**
+     * @OA\Patch(
+     *     path="/users/{id}",
+     *     tags={"Utilisateurs"},
+     *     summary="Modifier un utilisateur (ADMIN)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\RequestBody(
+     *         @OA\JsonContent(
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="password", type="string", minLength=8),
+     *             @OA\Property(property="role", type="string", enum={"ADMIN","VENDEUR"}),
+     *             @OA\Property(property="boutiqueId", type="string", format="uuid", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Mis à jour", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function update(Request $request, string $id): JsonResponse
     {
         $user = User::find($id);
@@ -64,6 +134,17 @@ class UserController extends Controller
         return $this->success($user->fresh());
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/users/{id}",
+     *     tags={"Utilisateurs"},
+     *     summary="Supprimer un utilisateur (ADMIN)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Supprimé", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function destroy(string $id): JsonResponse
     {
         $user = User::find($id);

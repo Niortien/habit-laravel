@@ -25,6 +25,15 @@ class SortieController extends Controller
         return $user->role === 'ADMIN' ? ($request->query('boutiqueId') ?? null) : $user->boutique_id;
     }
 
+    /**
+     * @OA\Get(path="/sorties", tags={"Sorties"}, summary="Liste des sorties (paginée)", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="type", in="query", @OA\Schema(type="string", enum={"VENTE","PERTE","DON","RETOUR_FOURNISSEUR"})),
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Response(response=200, description="Sorties", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function index(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
@@ -50,6 +59,24 @@ class SortieController extends Controller
         return $this->success($s);
     }
 
+    /**
+     * @OA\Post(path="/sorties", tags={"Sorties"}, summary="Créer une sortie / vente", security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"type","lignes"},
+     *             @OA\Property(property="type", type="string", enum={"VENTE","PERTE","DON","RETOUR_FOURNISSEUR"}),
+     *             @OA\Property(property="remiseMontant", type="number", nullable=true),
+     *             @OA\Property(property="notes", type="string", nullable=true),
+     *             @OA\Property(property="lignes", type="array", @OA\Items(type="object",
+     *                 @OA\Property(property="varianteId", type="string", format="uuid"),
+     *                 @OA\Property(property="quantite", type="integer"),
+     *                 @OA\Property(property="prixUnitaire", type="number")
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Sortie créée", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=409, description="Pas de session caisse ouverte / stock insuffisant", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([

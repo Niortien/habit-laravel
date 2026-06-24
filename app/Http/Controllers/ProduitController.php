@@ -21,11 +21,29 @@ class ProduitController extends Controller
 
     public function __construct(private CloudinaryService $cloudinary) {}
 
+    /**
+     * @OA\Get(path="/categories", tags={"Produits"}, summary="Liste toutes les catégories",
+     *     @OA\Response(response=200, description="Catégories",
+     *         @OA\JsonContent(@OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Categorie")),
+     *             @OA\Property(property="meta", type="object", nullable=true), @OA\Property(property="timestamp", type="string", format="date-time"))
+     *     )
+     * )
+     */
     public function categories(): JsonResponse
     {
         return $this->success(Categorie::orderBy('nom')->get());
     }
 
+    /**
+     * @OA\Get(path="/produits", tags={"Produits"}, summary="Liste des produits (paginée)",
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer", default=1)),
+     *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer", default=20)),
+     *     @OA\Parameter(name="search", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="categorieId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Liste paginée des produits", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function index(Request $request): JsonResponse
     {
         $q = Produit::with(['categorie', 'variantes', 'images'])->where('is_actif', true);
@@ -45,6 +63,13 @@ class ProduitController extends Controller
         return $this->paginated($data, $total, $page, $limit);
     }
 
+    /**
+     * @OA\Get(path="/produits/{id}", tags={"Produits"}, summary="Détail d'un produit",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Produit", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function show(string $id): JsonResponse
     {
         $p = Produit::with(['categorie', 'variantes', 'images'])->find($id);
@@ -52,6 +77,26 @@ class ProduitController extends Controller
         return $this->success($p);
     }
 
+    /**
+     * @OA\Post(path="/produits", tags={"Produits"}, summary="Créer un produit", security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"nom","categorieId","prixVente","prixAchat"},
+     *             @OA\Property(property="nom", type="string"),
+     *             @OA\Property(property="categorieId", type="string", format="uuid"),
+     *             @OA\Property(property="prixVente", type="number"),
+     *             @OA\Property(property="prixAchat", type="number"),
+     *             @OA\Property(property="description", type="string", nullable=true),
+     *             @OA\Property(property="imageUrl", type="string", nullable=true, description="URL ou base64"),
+     *             @OA\Property(property="variantes", type="array", @OA\Items(type="object",
+     *                 @OA\Property(property="taille", type="string"),
+     *                 @OA\Property(property="couleur", type="string"),
+     *                 @OA\Property(property="quantiteStock", type="integer")
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Produit créé", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -116,6 +161,13 @@ class ProduitController extends Controller
         return $this->success($produit->load(['categorie', 'variantes', 'images']), 201);
     }
 
+    /**
+     * @OA\Patch(path="/produits/{id}", tags={"Produits"}, summary="Modifier un produit", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Mis à jour", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function update(Request $request, string $id): JsonResponse
     {
         $produit = Produit::find($id);
@@ -150,6 +202,13 @@ class ProduitController extends Controller
         return $this->success($produit->fresh()->load(['categorie', 'variantes', 'images']));
     }
 
+    /**
+     * @OA\Delete(path="/produits/{id}", tags={"Produits"}, summary="Désactiver un produit", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Désactivé", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
     public function destroy(string $id): JsonResponse
     {
         $produit = Produit::find($id);
