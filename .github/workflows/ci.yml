@@ -82,9 +82,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Déploiement via Hostinger Git Webhook
+      - name: Déploiement via Webhook
         run: |
-          curl -X POST "${{ secrets.HOSTINGER_DEPLOY_WEBHOOK }}" \
+          curl -X POST "https://dri-vale.org/deploy.php" \
+            -H "X-Deploy-Secret: ${{ secrets.DEPLOY_SECRET }}" \
             --fail \
             --silent \
             --show-error
