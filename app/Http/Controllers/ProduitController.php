@@ -121,7 +121,7 @@ class ProduitController extends Controller
             try {
                 $imageUrl = $this->cloudinary->uploadBase64($data['imageUrl']);
             } catch (\RuntimeException $e) {
-                throw new \App\Exceptions\DomainException("Impossible d'uploader l'image. Vérifie la configuration Cloudinary.", 422, 'IMAGE_UPLOAD_FAILED');
+                throw new \App\Exceptions\DomainException('IMAGE_UPLOAD_FAILED: ' . $e->getMessage(), 422, 'IMAGE_UPLOAD_FAILED');
             }
         } elseif (!empty($data['imageUrl'])) {
             $imageUrl = $data['imageUrl'];
@@ -196,7 +196,7 @@ class ProduitController extends Controller
             try {
                 $data['imageUrl'] = $this->cloudinary->uploadBase64($data['imageUrl']);
             } catch (\RuntimeException $e) {
-                throw new \App\Exceptions\DomainException("Impossible d'uploader l'image. Vérifie la configuration Cloudinary.", 422, 'IMAGE_UPLOAD_FAILED');
+                throw new \App\Exceptions\DomainException('IMAGE_UPLOAD_FAILED: ' . $e->getMessage(), 422, 'IMAGE_UPLOAD_FAILED');
             }
         }
 
