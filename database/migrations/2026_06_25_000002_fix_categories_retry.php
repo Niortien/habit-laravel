@@ -5,14 +5,17 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+/**
+ * Cette migration est un rattrapage de 2026_06_25_000001_reset_categories
+ * qui avait échoué car elle tentait d'insérer created_at/updated_at dans
+ * une table sans colonnes de timestamps.
+ *
+ * Elle re-insère les catégories manquantes (INSERT IGNORE pour idempotence).
+ */
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        DB::table('categories')->truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-
         $catDefs = [
             // Hauts
             ['nom' => 'Tee-shirt',             'slug' => 'tee-shirt',             'description' => 'Hauts'],
@@ -66,12 +69,15 @@ return new class extends Migration
         ];
 
         foreach ($catDefs as $cat) {
-            DB::table('categories')->insert([
-                'id'          => (string) Str::uuid(),
-                'nom'         => $cat['nom'],
-                'slug'        => $cat['slug'],
-                'description' => $cat['description'],
-            ]);
+            $exists = DB::table('categories')->where('slug', $cat['slug'])->exists();
+            if (!$exists) {
+                DB::table('categories')->insert([
+                    'id'          => (string) Str::uuid(),
+                    'nom'         => $cat['nom'],
+                    'slug'        => $cat['slug'],
+                    'description' => $cat['description'],
+                ]);
+            }
         }
 
         Cache::forget('categories.all');
@@ -82,5 +88,6 @@ return new class extends Migration
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('categories')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        Cache::forget('categories.all');
     }
 };
