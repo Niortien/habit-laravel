@@ -188,6 +188,10 @@ class ProduitController extends Controller
             'dateFinPromo'   => 'sometimes|nullable|date',
         ]);
 
+        if (!empty($data['imageUrl']) && str_starts_with($data['imageUrl'], 'data:')) {
+            $data['imageUrl'] = $this->cloudinary->uploadBase64($data['imageUrl']);
+        }
+
         $map = [
             'nom' => 'nom', 'description' => 'description', 'prixVente' => 'prix_vente',
             'prixAchat' => 'prix_achat', 'imageUrl' => 'image_url', 'isActif' => 'is_actif',
