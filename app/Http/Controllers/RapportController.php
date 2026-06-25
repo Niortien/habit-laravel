@@ -49,13 +49,19 @@ class RapportController extends Controller
             default   => '%Y-%m-%d',
         };
 
-        $transactions = Transaction::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(montant) as total, COUNT(*) as count")
+        $transactions = Transaction::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(montant) as totalVentes, COUNT(*) as nombreTransactions")
             ->where('created_at', '>=', $dateDebut)
             ->where('created_at', '<=', $dateFin . ' 23:59:59')
             ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
             ->groupBy('periode')
             ->orderBy('periode')
-            ->get();
+            ->get()
+            ->map(fn($row) => [
+                'periode'           => $row->periode,
+                'totalVentes'       => number_format((float) $row->totalVentes, 2, '.', ''),
+                'nombreTransactions' => (int) $row->nombreTransactions,
+                'nombreSorties'     => (int) $row->nombreTransactions,
+            ]);
 
         return $this->success($transactions);
     }
@@ -67,34 +73,27 @@ class RapportController extends Controller
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
             ->get();
 
-        $valeurAchat  = '0.00';
-        $valeurVente  = '0.00';
-        $totalUnites  = 0;
-        $details      = [];
+        $valeurAchat     = '0.00';
+        $valeurVente     = '0.00';
+        $nombreVariantes = 0;
+        $produitIds      = [];
 
         foreach ($variantes as $v) {
+            if (!$v->produit) continue;
             $va = bcmul((string) $v->produit->prix_achat, (string) $v->quantite_stock, 2);
             $vv = bcmul((string) $v->produit->prix_vente, (string) $v->quantite_stock, 2);
             $valeurAchat = bcadd($valeurAchat, $va, 2);
             $valeurVente = bcadd($valeurVente, $vv, 2);
-            $totalUnites += $v->quantite_stock;
-            $details[] = [
-                'varianteId'    => $v->id,
-                'produit'       => $v->produit->nom,
-                'taille'        => $v->taille,
-                'couleur'       => $v->couleur,
-                'stock'         => $v->quantite_stock,
-                'valeurAchat'   => $va,
-                'valeurVente'   => $vv,
-            ];
+            $nombreVariantes++;
+            $produitIds[$v->produit_id] = true;
         }
 
         return $this->success([
             'valeurTotaleAchat'  => $valeurAchat,
             'valeurTotaleVente'  => $valeurVente,
             'beneficePotentiel'  => bcsub($valeurVente, $valeurAchat, 2),
-            'totalUnites'        => $totalUnites,
-            'details'            => $details,
+            'nombreVariantes'    => $nombreVariantes,
+            'nombreProduits'     => count($produitIds),
         ]);
     }
 
@@ -121,24 +120,47 @@ class RapportController extends Controller
     public function fluxTresorerie(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
+        $groupBy    = $request->get('groupBy', 'jour');
         $dateDebut  = $request->get('dateDebut', now()->subDays(30)->toDateString());
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
-        $entrees = Entree::where('created_at', '>=', $dateDebut)
+        $format = match ($groupBy) {
+            'semaine' => '%Y-%u',
+            'mois'    => '%Y-%m',
+            default   => '%Y-%m-%d',
+        };
+
+        $entreesRaw = Entree::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(total_cout) as total")
+            ->where('created_at', '>=', $dateDebut)
             ->where('created_at', '<=', $dateFin . ' 23:59:59')
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
-            ->sum('total_cout');
+            ->groupBy('periode')
+            ->pluck('total', 'periode')
+            ->toArray();
 
-        $sorties = Transaction::where('created_at', '>=', $dateDebut)
+        $sortiesRaw = Transaction::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(montant) as total")
+            ->where('created_at', '>=', $dateDebut)
             ->where('created_at', '<=', $dateFin . ' 23:59:59')
             ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->sum('montant');
+            ->groupBy('periode')
+            ->pluck('total', 'periode')
+            ->toArray();
 
-        return $this->success([
-            'totalEntrees'  => number_format((float) $entrees, 2, '.', ''),
-            'totalSorties'  => number_format((float) $sorties, 2, '.', ''),
-            'solde'         => number_format((float) $sorties - (float) $entrees, 2, '.', ''),
-        ]);
+        $periodes = array_unique(array_merge(array_keys($entreesRaw), array_keys($sortiesRaw)));
+        sort($periodes);
+
+        $result = array_map(function ($periode) use ($entreesRaw, $sortiesRaw) {
+            $e = (float) ($entreesRaw[$periode] ?? 0);
+            $s = (float) ($sortiesRaw[$periode] ?? 0);
+            return [
+                'periode' => $periode,
+                'entrees' => number_format($e, 2, '.', ''),
+                'sorties' => number_format($s, 2, '.', ''),
+                'solde'   => number_format($s - $e, 2, '.', ''),
+            ];
+        }, $periodes);
+
+        return $this->success(array_values($result));
     }
 
     /**
@@ -157,32 +179,74 @@ class RapportController extends Controller
     public function resumeDashboard(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
-        $today      = now()->startOfDay();
+        $dateDebut  = $request->get('dateDebut', now()->subDays(6)->toDateString());
+        $dateFin    = $request->get('dateFin', now()->toDateString());
 
-        $ventesToday = Transaction::where('created_at', '>=', $today)
+        // Ventes groupées par jour sur la période
+        $ventesRows = Transaction::selectRaw("DATE_FORMAT(created_at, '%Y-%m-%d') as periode, SUM(montant) as totalVentes, COUNT(*) as nombreTransactions")
+            ->where('created_at', '>=', $dateDebut)
+            ->where('created_at', '<=', $dateFin . ' 23:59:59')
             ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->sum('montant');
+            ->groupBy('periode')
+            ->orderBy('periode')
+            ->get()
+            ->map(fn($r) => [
+                'periode'           => $r->periode,
+                'totalVentes'       => number_format((float) $r->totalVentes, 2, '.', ''),
+                'nombreSorties'     => (int) $r->nombreTransactions,
+            ])
+            ->values()
+            ->toArray();
 
-        $alertes = Variante::whereColumn('quantite_stock', '<=', 'seuil_alerte')
-            ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
-            ->count();
-
-        $produitsActifs = Produit::where('is_actif', true)->count();
-
-        $topProduits = MouvementStock::selectRaw('variante_id, SUM(quantite) as totalVendu')
+        // Top 5 produits — 7 derniers jours
+        $topRaw = MouvementStock::selectRaw('variante_id, SUM(ABS(quantite)) as totalVendu')
             ->where('type', 'SORTIE')
-            ->where('created_at', '>=', now()->subDays(30))
+            ->where('created_at', '>=', now()->subDays(6)->startOfDay())
+            ->when($boutiqueId, fn($q) => $q->whereHas('variante', fn($v) => $v->where('boutique_id', $boutiqueId)))
             ->groupBy('variante_id')
             ->orderByDesc('totalVendu')
             ->limit(5)
             ->with('variante.produit')
             ->get();
 
+        $topProduits = $topRaw->filter(fn($r) => $r->variante && $r->variante->produit)
+            ->map(fn($r) => [
+                'produitId'      => $r->variante->produit->id,
+                'nom'            => $r->variante->produit->nom,
+                'sku'            => $r->variante->produit->sku,
+                'quantiteTotale' => (int) $r->totalVendu,
+                'montantTotal'   => number_format(
+                    (float) $r->totalVendu * (float) $r->variante->produit->prix_vente, 2, '.', ''
+                ),
+            ])
+            ->values()
+            ->toArray();
+
+        // Diagnostic
+        $totalProduits      = Produit::where('is_actif', true)->count();
+        $totalVariantes     = Variante::when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))->count();
+        $totalEntrees       = \App\Models\Entree::when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))->count();
+        $totalVentesAllTime = (int) Transaction::when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))->count();
+        $totalVentes7j      = (int) Transaction::where('created_at', '>=', now()->subDays(6)->startOfDay())
+            ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
+            ->count();
+        $sessionsOuvertes   = \App\Models\CaisseSession::where('statut', 'OUVERTE')
+            ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+            ->count();
+
         return $this->success([
-            'ventesAujourdhui'  => number_format((float) $ventesToday, 2, '.', ''),
-            'alertesStock'      => $alertes,
-            'produitsActifs'    => $produitsActifs,
-            'topProduits'       => $topProduits,
+            'periode'     => ['debut' => $dateDebut, 'fin' => $dateFin],
+            'ventes'      => $ventesRows,
+            'topProduits' => $topProduits,
+            'diagnostic'  => [
+                'totalProduits'     => $totalProduits,
+                'totalVariantes'    => $totalVariantes,
+                'totalEntrees'      => $totalEntrees,
+                'totalVentesAllTime' => $totalVentesAllTime,
+                'totalVentes7j'     => $totalVentes7j,
+                'sessionsOuvertes'  => $sessionsOuvertes,
+                'hasData'           => $totalProduits > 0 || $totalEntrees > 0,
+            ],
         ]);
     }
 
