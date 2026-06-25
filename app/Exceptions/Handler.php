@@ -53,6 +53,12 @@ class Handler extends ExceptionHandler
                 ], 404);
             }
 
+            \Illuminate\Support\Facades\Log::error('Unhandled API error', [
+                'class'   => get_class($e),
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'error' => ['code' => 'INTERNAL_SERVER_ERROR', 'message' => 'Une erreur inattendue est survenue.', 'details' => null],
                 'path'  => $path,

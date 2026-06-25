@@ -118,7 +118,11 @@ class ProduitController extends Controller
 
         $imageUrl = null;
         if (!empty($data['imageUrl']) && str_starts_with($data['imageUrl'], 'data:')) {
-            $imageUrl = $this->cloudinary->uploadBase64($data['imageUrl']);
+            try {
+                $imageUrl = $this->cloudinary->uploadBase64($data['imageUrl']);
+            } catch (\RuntimeException $e) {
+                throw new \App\Exceptions\DomainException("Impossible d'uploader l'image. Vérifie la configuration Cloudinary.", 422, 'IMAGE_UPLOAD_FAILED');
+            }
         } elseif (!empty($data['imageUrl'])) {
             $imageUrl = $data['imageUrl'];
         }
@@ -189,7 +193,11 @@ class ProduitController extends Controller
         ]);
 
         if (!empty($data['imageUrl']) && str_starts_with($data['imageUrl'], 'data:')) {
-            $data['imageUrl'] = $this->cloudinary->uploadBase64($data['imageUrl']);
+            try {
+                $data['imageUrl'] = $this->cloudinary->uploadBase64($data['imageUrl']);
+            } catch (\RuntimeException $e) {
+                throw new \App\Exceptions\DomainException("Impossible d'uploader l'image. Vérifie la configuration Cloudinary.", 422, 'IMAGE_UPLOAD_FAILED');
+            }
         }
 
         $map = [

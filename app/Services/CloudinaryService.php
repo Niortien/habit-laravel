@@ -27,20 +27,32 @@ class CloudinaryService
 
     public function uploadFile(string $filePath, string $folder = 'produits'): string
     {
-        $result = $this->client()->uploadApi()->upload($filePath, ['folder' => $folder, 'resource_type' => 'image']);
-        return $result['secure_url'];
+        try {
+            $result = $this->client()->uploadApi()->upload($filePath, ['folder' => $folder, 'resource_type' => 'image']);
+            return $result['secure_url'];
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Cloudinary upload failed: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     public function uploadBase64(string $dataUrl, string $folder = 'produits'): string
     {
-        $result = $this->client()->uploadApi()->upload($dataUrl, ['folder' => $folder, 'resource_type' => 'image']);
-        return $result['secure_url'];
+        try {
+            $result = $this->client()->uploadApi()->upload($dataUrl, ['folder' => $folder, 'resource_type' => 'image']);
+            return $result['secure_url'];
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Cloudinary upload failed: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     public function deleteByUrl(string $url): void
     {
         if (preg_match('/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i', $url, $matches)) {
-            $this->client()->uploadApi()->destroy($matches[1]);
+            try {
+                $this->client()->uploadApi()->destroy($matches[1]);
+            } catch (\Throwable) {
+                // Suppression non bloquante
+            }
         }
     }
 }
