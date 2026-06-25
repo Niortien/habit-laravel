@@ -103,7 +103,7 @@ class RapportController extends Controller
         $dateDebut  = $request->get('dateDebut', now()->subDays(30)->toDateString());
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
-        $top = MouvementStock::selectRaw('variante_id, SUM(quantite) as totalVendu')
+        $top = MouvementStock::selectRaw('variante_id, SUM(ABS(quantite)) as totalVendu')
             ->where('type', 'SORTIE')
             ->where('created_at', '>=', $dateDebut)
             ->where('created_at', '<=', $dateFin . ' 23:59:59')
@@ -114,7 +114,19 @@ class RapportController extends Controller
             ->with('variante.produit')
             ->get();
 
-        return $this->success($top);
+        $result = $top->filter(fn($r) => $r->variante && $r->variante->produit)
+            ->map(fn($r) => [
+                'produitId'      => $r->variante->produit->id,
+                'nom'            => $r->variante->produit->nom,
+                'sku'            => $r->variante->produit->sku,
+                'quantiteTotale' => (int) $r->totalVendu,
+                'montantTotal'   => number_format(
+                    (float) $r->totalVendu * (float) $r->variante->produit->prix_vente, 2, '.', ''
+                ),
+            ])
+            ->values();
+
+        return $this->success($result);
     }
 
     public function fluxTresorerie(Request $request): JsonResponse
