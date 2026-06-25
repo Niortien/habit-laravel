@@ -1,39 +1,18 @@
 <?php
 
-namespace Database\Seeders;
-
-use App\Models\Categorie;
-use App\Models\User;
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-class DatabaseSeeder extends Seeder
+return new class extends Migration
 {
-    public function run(): void
+    public function up(): void
     {
-        $this->seedUsers();
-        $this->seedCategories();
-    }
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('categories')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-    private function seedUsers(): void
-    {
-        $users = [
-            ['email' => 'admin@shop.com',   'password' => 'StrongPass123!', 'role' => 'ADMIN'],
-            ['email' => 'vendeur@shop.com', 'password' => 'StrongPass123!', 'role' => 'VENDEUR'],
-        ];
-
-        foreach ($users as $u) {
-            User::firstOrCreate(
-                ['email' => $u['email']],
-                ['password_hash' => Hash::make($u['password']), 'role' => $u['role']]
-            );
-        }
-        
-    }
-
-    private function seedCategories(): void
-    {
         $catDefs = [
             // Hauts
             ['nom' => 'Tee-shirt',             'slug' => 'tee-shirt',             'description' => 'Hauts'],
@@ -86,11 +65,25 @@ class DatabaseSeeder extends Seeder
             ['nom' => 'Lunette',               'slug' => 'lunette',               'description' => 'Parfum & Bijoux'],
         ];
 
+        $now = now();
         foreach ($catDefs as $cat) {
-            Categorie::firstOrCreate(
-                ['slug' => $cat['slug']],
-                ['nom' => $cat['nom'], 'description' => $cat['description']]
-            );
+            DB::table('categories')->insert([
+                'id'          => (string) Str::uuid(),
+                'nom'         => $cat['nom'],
+                'slug'        => $cat['slug'],
+                'description' => $cat['description'],
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]);
         }
+
+        Cache::forget('categories.all');
     }
-}
+
+    public function down(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('categories')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+    }
+};
