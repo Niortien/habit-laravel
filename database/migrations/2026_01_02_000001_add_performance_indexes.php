@@ -29,7 +29,7 @@ return new class extends Migration
 
         Schema::table('transactions', function (Blueprint $table) {
             $table->index('created_at');
-            $table->index('type');
+            $table->index('mode_paiement');
         });
     }
 
@@ -52,7 +52,7 @@ return new class extends Migration
         });
         Schema::table('transactions', function (Blueprint $table) {
             $table->dropIndex(['created_at']);
-            $table->dropIndex(['type']);
+            $table->dropIndex(['mode_paiement']);
         });
     }
 };
