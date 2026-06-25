@@ -82,44 +82,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
-
-      - name: Déploiement via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            set -e
-
-            echo "→ Navigation vers le projet"
-            cd ${{ secrets.APP_PATH }}
-
-            echo "→ Mise à jour du code"
-            git pull origin main
-
-            echo "→ Mode maintenance activé"
-            php artisan down --retry=60
-
-            echo "→ Installation des dépendances"
-            composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
-
-            echo "→ Migrations"
-            php artisan migrate --force
-
-            echo "→ Seeding"
-            php artisan db:seed --force
-
-            echo "→ Nettoyage des caches"
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
-            php artisan event:cache
-
-            echo "→ Mode maintenance désactivé"
-            php artisan up
-
-            echo "✓ Déploiement terminé"
+      - name: Déploiement via Webhook
+        run: |
+          curl -X POST "https://dri-vale.org/deploy.php" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '{}' | openssl dgst -sha256 -hmac '${{ secrets.DEPLOY_SECRET }}' | awk '{print $2}')" \
+            -d '{}' \
+            --fail \
+            --silent \
+            --show-error
