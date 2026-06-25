@@ -110,6 +110,9 @@ jobs:
             echo "→ Migrations"
             php artisan migrate --force
 
+            echo "→ Seeding"
+            php artisan db:seed --force
+
             echo "→ Nettoyage des caches"
             php artisan config:cache
             php artisan route:cache
