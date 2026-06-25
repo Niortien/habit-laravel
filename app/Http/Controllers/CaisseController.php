@@ -186,7 +186,6 @@ class CaisseController extends Controller
             ->when($boutiqueId, fn($q) => $q
                 ->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
                 ->where('cs.boutique_id', $boutiqueId)
-                ->select('transactions.*')
             );
 
         $totaux = Transaction::query()
