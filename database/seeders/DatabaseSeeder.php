@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
                 ['password_hash' => Hash::make($u['password']), 'role' => $u['role']]
             );
         }
+        
     }
 
     private function seedCategories(): void

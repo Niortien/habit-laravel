@@ -11,6 +11,7 @@ use App\Services\StockMovementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+
 class StockController extends Controller
 {
     use ApiResponse;
