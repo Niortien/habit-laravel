@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Cloudinary\Cloudinary;
-use Cloudinary\Configuration\Configuration;
 
 class CloudinaryService
 {
@@ -12,15 +11,14 @@ class CloudinaryService
     private function client(): Cloudinary
     {
         if ($this->cloudinary === null) {
-            Configuration::instance([
+            $this->cloudinary = new Cloudinary([
                 'cloud' => [
                     'cloud_name' => config('cloudinary.cloud_name'),
                     'api_key'    => config('cloudinary.api_key'),
                     'api_secret' => config('cloudinary.api_secret'),
                 ],
-                'url'   => ['secure' => true],
+                'url' => ['secure' => true],
             ]);
-            $this->cloudinary = new Cloudinary();
         }
         return $this->cloudinary;
     }
