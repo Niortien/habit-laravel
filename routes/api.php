@@ -19,8 +19,8 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/refresh', [AuthController::class, 'refresh']);
 
     // ── Public catalogue ───────────────────────────────────────────────────
-    Route::get('categories',         [ProduitController::class, 'categories']);
-    Route::get('produits',           [ProduitController::class, 'index']);
+    Route::get('produits/categories', [ProduitController::class, 'categories']);
+    Route::get('produits',            [ProduitController::class, 'index']);
     Route::get('produits/{id}',      [ProduitController::class, 'show']);
 
     // ── Protected routes ───────────────────────────────────────────────────
@@ -65,8 +65,8 @@ Route::prefix('v1')->group(function () {
         // Caisse
         Route::get('caisse/sessions',                          [CaisseController::class, 'listSessions']);
         Route::get('caisse/sessions/active',                   [CaisseController::class, 'activeSession']);
-        Route::post('caisse/sessions',                         [CaisseController::class, 'openSession']);
-        Route::patch('caisse/sessions/{id}/fermer',            [CaisseController::class, 'closeSession']);
+        Route::post('caisse/sessions/ouvrir',                  [CaisseController::class, 'openSession']);
+        Route::post('caisse/sessions/{id}/fermer',             [CaisseController::class, 'closeSession']);
         Route::get('caisse/sessions/{id}/transactions',        [CaisseController::class, 'listTransactions']);
         Route::post('caisse/transactions',                     [CaisseController::class, 'createTransaction']);
         Route::get('caisse/resume-jour',                       [CaisseController::class, 'resumeJour']);
@@ -77,8 +77,8 @@ Route::prefix('v1')->group(function () {
         Route::get('rapports/stock-valeur',     [RapportController::class, 'stockValeur']);
         Route::get('rapports/top-produits',     [RapportController::class, 'topProduits']);
         Route::get('rapports/flux-tresorerie',  [RapportController::class, 'fluxTresorerie']);
-        Route::get('rapports/export-excel',     [RapportController::class, 'exportExcel']);
-        Route::get('rapports/export-pdf',       [RapportController::class, 'exportPdf']);
+        Route::get('rapports/export/excel',     [RapportController::class, 'exportExcel']);
+        Route::get('rapports/export/pdf',       [RapportController::class, 'exportPdf']);
 
         // ── Admin-only ──────────────────────────────────────────────────────
         Route::middleware('role:ADMIN')->group(function () {
