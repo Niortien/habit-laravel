@@ -60,7 +60,11 @@ class Handler extends ExceptionHandler
             ]);
 
             return response()->json([
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR', 'message' => 'Une erreur inattendue est survenue.', 'details' => null],
+                'error' => [
+                    'code'    => 'INTERNAL_SERVER_ERROR',
+                    'message' => get_class($e) . ': ' . $e->getMessage(),
+                    'details' => ['file' => $e->getFile() . ':' . $e->getLine()],
+                ],
                 'path'  => $path,
                 'timestamp' => $ts,
             ], 500);
