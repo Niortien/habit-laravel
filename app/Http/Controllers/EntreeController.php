@@ -7,6 +7,7 @@ use App\Http\Traits\ApiResponse;
 use App\Models\Boutique;
 use App\Models\Categorie;
 use App\Models\Entree;
+
 use App\Models\Produit;
 use App\Models\Variante;
 
