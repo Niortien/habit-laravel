@@ -6,6 +6,7 @@ use App\Models\Categorie;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -76,7 +77,10 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($categories as $cat) {
-            Categorie::firstOrCreate(['nom' => $cat['nom']], ['description' => $cat['description']]);
+            Categorie::firstOrCreate(
+                ['nom' => $cat['nom']],
+                ['slug' => Str::slug($cat['nom']), 'description' => $cat['description']]
+            );
         }
     }
 }
