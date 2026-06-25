@@ -13,6 +13,7 @@ use App\Models\Variante;
 use App\Services\CloudinaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class ProduitController extends Controller
@@ -31,7 +32,8 @@ class ProduitController extends Controller
      */
     public function categories(): JsonResponse
     {
-        return $this->success(Categorie::orderBy('nom')->get());
+        $data = Cache::remember('categories.all', 3600, fn () => Categorie::orderBy('nom')->get());
+        return $this->success($data);
     }
 
     /**
