@@ -49,18 +49,23 @@ class RapportController extends Controller
             default   => '%Y-%m-%d',
         };
 
-        $transactions = Transaction::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(montant) as totalVentes, COUNT(*) as nombreTransactions")
-            ->where('created_at', '>=', $dateDebut)
-            ->where('created_at', '<=', $dateFin . ' 23:59:59')
-            ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->groupBy('periode')
+        $q = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '{$format}') as periode, SUM(transactions.montant) as totalVentes, COUNT(*) as nombreTransactions")
+            ->where('transactions.created_at', '>=', $dateDebut)
+            ->where('transactions.created_at', '<=', $dateFin . ' 23:59:59');
+
+        if ($boutiqueId) {
+            $q->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
+              ->where('cs.boutique_id', $boutiqueId);
+        }
+
+        $transactions = $q->groupBy('periode')
             ->orderBy('periode')
             ->get()
             ->map(fn($row) => [
-                'periode'           => $row->periode,
-                'totalVentes'       => number_format((float) $row->totalVentes, 2, '.', ''),
+                'periode'            => $row->periode,
+                'totalVentes'        => number_format((float) $row->totalVentes, 2, '.', ''),
                 'nombreTransactions' => (int) $row->nombreTransactions,
-                'nombreSorties'     => (int) $row->nombreTransactions,
+                'nombreSorties'      => (int) $row->nombreTransactions,
             ]);
 
         return $this->success($transactions);
@@ -69,31 +74,28 @@ class RapportController extends Controller
     public function stockValeur(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
-        $variantes  = Variante::with('produit')
-            ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
-            ->get();
 
-        $valeurAchat     = '0.00';
-        $valeurVente     = '0.00';
-        $nombreVariantes = 0;
-        $produitIds      = [];
+        $row = \Illuminate\Support\Facades\DB::table('variantes as v')
+            ->join('produits as p', 'v.produit_id', '=', 'p.id')
+            ->where('p.is_actif', true)
+            ->when($boutiqueId, fn($q) => $q->where('v.boutique_id', $boutiqueId))
+            ->selectRaw('
+                COALESCE(SUM(v.quantite_stock * p.prix_achat), 0) as valeurAchat,
+                COALESCE(SUM(v.quantite_stock * p.prix_vente), 0) as valeurVente,
+                COUNT(DISTINCT v.produit_id) as nombreProduits,
+                COUNT(*) as nombreVariantes
+            ')
+            ->first();
 
-        foreach ($variantes as $v) {
-            if (!$v->produit) continue;
-            $va = bcmul((string) $v->produit->prix_achat, (string) $v->quantite_stock, 2);
-            $vv = bcmul((string) $v->produit->prix_vente, (string) $v->quantite_stock, 2);
-            $valeurAchat = bcadd($valeurAchat, $va, 2);
-            $valeurVente = bcadd($valeurVente, $vv, 2);
-            $nombreVariantes++;
-            $produitIds[$v->produit_id] = true;
-        }
+        $valeurAchat = number_format((float) $row->valeurAchat, 2, '.', '');
+        $valeurVente = number_format((float) $row->valeurVente, 2, '.', '');
 
         return $this->success([
             'valeurTotaleAchat'  => $valeurAchat,
             'valeurTotaleVente'  => $valeurVente,
-            'beneficePotentiel'  => bcsub($valeurVente, $valeurAchat, 2),
-            'nombreVariantes'    => $nombreVariantes,
-            'nombreProduits'     => count($produitIds),
+            'beneficePotentiel'  => number_format((float) $valeurVente - (float) $valeurAchat, 2, '.', ''),
+            'nombreVariantes'    => (int) $row->nombreVariantes,
+            'nombreProduits'     => (int) $row->nombreProduits,
         ]);
     }
 
@@ -150,13 +152,14 @@ class RapportController extends Controller
             ->pluck('total', 'periode')
             ->toArray();
 
-        $sortiesRaw = Transaction::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(montant) as total")
-            ->where('created_at', '>=', $dateDebut)
-            ->where('created_at', '<=', $dateFin . ' 23:59:59')
-            ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->groupBy('periode')
-            ->pluck('total', 'periode')
-            ->toArray();
+        $sortiesQ = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '{$format}') as periode, SUM(transactions.montant) as total")
+            ->where('transactions.created_at', '>=', $dateDebut)
+            ->where('transactions.created_at', '<=', $dateFin . ' 23:59:59');
+        if ($boutiqueId) {
+            $sortiesQ->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
+                     ->where('cs.boutique_id', $boutiqueId);
+        }
+        $sortiesRaw = $sortiesQ->groupBy('periode')->pluck('total', 'periode')->toArray();
 
         $periodes = array_unique(array_merge(array_keys($entreesRaw), array_keys($sortiesRaw)));
         sort($periodes);
@@ -195,17 +198,20 @@ class RapportController extends Controller
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
         // Ventes groupées par jour sur la période
-        $ventesRows = Transaction::selectRaw("DATE_FORMAT(created_at, '%Y-%m-%d') as periode, SUM(montant) as totalVentes, COUNT(*) as nombreTransactions")
-            ->where('created_at', '>=', $dateDebut)
-            ->where('created_at', '<=', $dateFin . ' 23:59:59')
-            ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->groupBy('periode')
+        $ventesQ = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '%Y-%m-%d') as periode, SUM(transactions.montant) as totalVentes, COUNT(*) as nombreTransactions")
+            ->where('transactions.created_at', '>=', $dateDebut)
+            ->where('transactions.created_at', '<=', $dateFin . ' 23:59:59');
+        if ($boutiqueId) {
+            $ventesQ->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
+                    ->where('cs.boutique_id', $boutiqueId);
+        }
+        $ventesRows = $ventesQ->groupBy('periode')
             ->orderBy('periode')
             ->get()
             ->map(fn($r) => [
-                'periode'           => $r->periode,
-                'totalVentes'       => number_format((float) $r->totalVentes, 2, '.', ''),
-                'nombreSorties'     => (int) $r->nombreTransactions,
+                'periode'       => $r->periode,
+                'totalVentes'   => number_format((float) $r->totalVentes, 2, '.', ''),
+                'nombreSorties' => (int) $r->nombreTransactions,
             ])
             ->values()
             ->toArray();
@@ -234,17 +240,31 @@ class RapportController extends Controller
             ->values()
             ->toArray();
 
-        // Diagnostic
-        $totalProduits      = Produit::where('is_actif', true)->count();
-        $totalVariantes     = Variante::when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))->count();
-        $totalEntrees       = \App\Models\Entree::when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))->count();
-        $totalVentesAllTime = (int) Transaction::when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))->count();
-        $totalVentes7j      = (int) Transaction::where('created_at', '>=', now()->subDays(6)->startOfDay())
-            ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->count();
-        $sessionsOuvertes   = \App\Models\CaisseSession::where('statut', 'OUVERTE')
-            ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
-            ->count();
+        // Diagnostic — regroupé en 2 requêtes au lieu de 6
+        $diagProduits = \Illuminate\Support\Facades\DB::table('produits as p')
+            ->leftJoin('variantes as v', 'v.produit_id', '=', 'p.id')
+            ->where('p.is_actif', true)
+            ->when($boutiqueId, fn($q) => $q->where('v.boutique_id', $boutiqueId))
+            ->selectRaw('COUNT(DISTINCT p.id) as totalProduits, COUNT(v.id) as totalVariantes')
+            ->first();
+
+        $diagCaisse = \Illuminate\Support\Facades\DB::table('caisse_sessions as cs')
+            ->when($boutiqueId, fn($q) => $q->where('cs.boutique_id', $boutiqueId))
+            ->leftJoin('transactions as t', 't.session_id', '=', 'cs.id')
+            ->selectRaw("
+                SUM(CASE WHEN cs.statut = 'OUVERTE' THEN 1 ELSE 0 END) as sessionsOuvertes,
+                COUNT(t.id) as totalVentesAllTime,
+                SUM(CASE WHEN t.created_at >= ? THEN 1 ELSE 0 END) as totalVentes7j
+            ", [now()->subDays(6)->startOfDay()])
+            ->first();
+
+        $totalEntrees = \App\Models\Entree::when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))->count();
+
+        $totalProduits   = (int) $diagProduits->totalProduits;
+        $totalVariantes  = (int) $diagProduits->totalVariantes;
+        $sessionsOuvertes  = (int) $diagCaisse->sessionsOuvertes;
+        $totalVentesAllTime = (int) $diagCaisse->totalVentesAllTime;
+        $totalVentes7j   = (int) $diagCaisse->totalVentes7j;
 
         return $this->success([
             'periode'     => ['debut' => $dateDebut, 'fin' => $dateFin],

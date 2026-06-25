@@ -10,6 +10,7 @@ use App\Models\Entree;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CaisseController extends Controller
 {
@@ -180,30 +181,39 @@ class CaisseController extends Controller
         $boutiqueId = $this->boutiqueId($request, $request->query('boutiqueId'));
         $todayStart = now()->startOfDay();
 
-        $transactions = Transaction::where('created_at', '>=', $todayStart)
-            ->when($boutiqueId, fn($q) => $q->whereHas('session', fn($s) => $s->where('boutique_id', $boutiqueId)))
-            ->get();
+        $txQuery = fn($q) => $q
+            ->where('transactions.created_at', '>=', $todayStart)
+            ->when($boutiqueId, fn($q) => $q
+                ->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
+                ->where('cs.boutique_id', $boutiqueId)
+                ->select('transactions.*')
+            );
 
-        $achats = Entree::where('created_at', '>=', $todayStart)
+        $totaux = Transaction::query()
+            ->tap($txQuery)
+            ->selectRaw('COALESCE(SUM(montant), 0) as totalVentes, COUNT(*) as totalTransactions')
+            ->first();
+
+        $parMode = Transaction::query()
+            ->tap($txQuery)
+            ->selectRaw('mode_paiement, COALESCE(SUM(montant), 0) as total')
+            ->groupBy('mode_paiement')
+            ->pluck('total', 'mode_paiement')
+            ->map(fn($v) => number_format((float) $v, 2, '.', ''))
+            ->toArray();
+
+        $totalAchats = (string) \Illuminate\Support\Facades\DB::table('entrees')
+            ->where('created_at', '>=', $todayStart)
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
-            ->get();
+            ->sum('total_cout');
+
+        $totalVentes = number_format((float) $totaux->totalVentes, 2, '.', '');
+        $totalAchats = number_format((float) $totalAchats, 2, '.', '');
 
         $session = CaisseSession::where('statut', 'OUVERTE')
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
             ->orderBy('date_ouverture', 'desc')
             ->first();
-
-        $totalVentes  = $transactions->reduce(fn($c, $t) => bcadd($c, (string) $t->montant, 2), '0.00');
-        $totalAchats  = $achats->reduce(fn($c, $e) => bcadd($c, (string) $e->total_cout, 2), '0.00');
-        $beneficeNet  = bcsub($totalVentes, $totalAchats, 2);
-
-        $parModePaiement = [];
-        foreach ($transactions as $tx) {
-            $parModePaiement[$tx->mode_paiement] = bcadd(
-                $parModePaiement[$tx->mode_paiement] ?? '0.00',
-                (string) $tx->montant, 2
-            );
-        }
 
         return $this->success([
             'session' => $session ? [
@@ -213,10 +223,10 @@ class CaisseController extends Controller
                 'dateOuverture'    => $session->date_ouverture->toISOString(),
             ] : null,
             'totalVentes'       => $totalVentes,
-            'totalTransactions' => $transactions->count(),
+            'totalTransactions' => (int) $totaux->totalTransactions,
             'totalAchats'       => $totalAchats,
-            'beneficeNet'       => $beneficeNet,
-            'parModePaiement'   => $parModePaiement,
+            'beneficeNet'       => number_format((float) $totalVentes - (float) $totalAchats, 2, '.', ''),
+            'parModePaiement'   => $parMode,
         ]);
     }
 }
