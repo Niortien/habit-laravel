@@ -24,7 +24,7 @@ return new class extends Migration
 
         Schema::table('caisse_sessions', function (Blueprint $table) {
             $table->index('statut');
-            $table->index('ouverture_at');
+            $table->index('date_ouverture');
         });
 
         Schema::table('transactions', function (Blueprint $table) {
@@ -48,7 +48,7 @@ return new class extends Migration
         });
         Schema::table('caisse_sessions', function (Blueprint $table) {
             $table->dropIndex(['statut']);
-            $table->dropIndex(['ouverture_at']);
+            $table->dropIndex(['date_ouverture']);
         });
         Schema::table('transactions', function (Blueprint $table) {
             $table->dropIndex(['created_at']);
