@@ -13,19 +13,20 @@ return new class extends Migration
         DB::table('categories')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
+        
         $catDefs = [
             // Hauts
             ['nom' => 'Tee-shirt',             'slug' => 'tee-shirt',             'description' => 'Hauts'],
             ['nom' => 'Polo',                  'slug' => 'polo',                  'description' => 'Hauts'],
-            ['nom' => 'Polo cr²op',             'slug' => 'polo-corp',             'description' => 'Hauts'],
+            ['nom' => 'Polo corp',             'slug' => 'polo-corp',             'description' => 'Hauts'],
             ['nom' => 'Polo sans col',         'slug' => 'polo-sans-col',         'description' => 'Hauts'],
             ['nom' => 'Polo cartigan',         'slug' => 'polo-cartigan',         'description' => 'Hauts'],
-            ['nom' => 'Démanbré',               'slug' => 'demanbre',               'description' => 'Hauts'],
-            ['nom' => 'Body',       'slug' => 'body',       'description' => 'Hauts'],
+            ['nom' => 'Déambré',               'slug' => 'deambre',               'description' => 'Hauts'],
+            ['nom' => 'Body',                  'slug' => 'body',                  'description' => 'Hauts'],
             ['nom' => 'Débardeur',             'slug' => 'debardeur',             'description' => 'Hauts'],
             // Chemises & Vestes
             ['nom' => 'Chemise simple',        'slug' => 'chemise-simple',        'description' => 'Chemises & Vestes'],
-            ['nom' => 'surchemise',    'slug' => 'surchemise',      'description' => 'Chemises & Vestes'],
+            ['nom' => 'Surchemise',            'slug' => 'surchemise',            'description' => 'Chemises & Vestes'],
             ['nom' => 'Chemise croppée',       'slug' => 'chemise-crope',         'description' => 'Chemises & Vestes'],
             ['nom' => 'Djaket',                'slug' => 'djaket',                'description' => 'Chemises & Vestes'],
             ['nom' => 'Doudoune',              'slug' => 'doudoune',              'description' => 'Chemises & Vestes'],
