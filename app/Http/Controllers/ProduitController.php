@@ -140,21 +140,18 @@ class ProduitController extends Controller
         ]);
 
         if (!empty($data['variantes'])) {
-            $boutiques = Boutique::pluck('id')->toArray();
+            $boutiqueIds = [];
+            if ($request->filled('boutiqueIds')) {
+                $boutiqueIds = array_filter(explode(',', $request->string('boutiqueIds')));
+            }
+            if (empty($boutiqueIds)) {
+                $boutiqueIds = Boutique::pluck('id')->toArray();
+            }
             foreach ($data['variantes'] as $v) {
-                foreach ($boutiques as $boutiqueId) {
+                foreach ($boutiqueIds as $boutiqueId) {
                     Variante::create([
                         'produit_id'     => $produit->id,
                         'boutique_id'    => $boutiqueId,
-                        'taille'         => $v['taille'],
-                        'couleur'        => $v['couleur'],
-                        'quantite_stock' => $v['quantiteStock'],
-                        'seuil_alerte'   => $v['seuilAlerte'] ?? 5,
-                    ]);
-                }
-                if (empty($boutiques)) {
-                    Variante::create([
-                        'produit_id'     => $produit->id,
                         'taille'         => $v['taille'],
                         'couleur'        => $v['couleur'],
                         'quantite_stock' => $v['quantiteStock'],
