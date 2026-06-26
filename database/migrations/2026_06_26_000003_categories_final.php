@@ -20,7 +20,7 @@ return new class extends Migration
             ['nom' => 'Polo corp',              'slug' => 'polo-corp',              'description' => 'Hauts'],
             ['nom' => 'Polo sans col',          'slug' => 'polo-sans-col',          'description' => 'Hauts'],
             ['nom' => 'Polo cartigan',          'slug' => 'polo-cartigan',          'description' => 'Hauts'],
-            ['nom' => 'Déambré',                'slug' => 'deambre',                'description' => 'Hauts'],
+            ['nom' => 'Démanbré',                'slug' => 'demanbre',                'description' => 'Hauts'],
             ['nom' => 'Body',                   'slug' => 'body',                   'description' => 'Hauts'],
             ['nom' => 'Débardeur',              'slug' => 'debardeur',              'description' => 'Hauts'],
             // Chemises & Vestes
