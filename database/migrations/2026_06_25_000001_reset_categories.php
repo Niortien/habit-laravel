@@ -17,13 +17,15 @@ return new class extends Migration
             // Hauts
             ['nom' => 'Tee-shirt',             'slug' => 'tee-shirt',             'description' => 'Hauts'],
             ['nom' => 'Polo',                  'slug' => 'polo',                  'description' => 'Hauts'],
-            ['nom' => 'Polo corp',             'slug' => 'polo-corp',             'description' => 'Hauts'],
+            ['nom' => 'Polo cr²op',             'slug' => 'polo-corp',             'description' => 'Hauts'],
             ['nom' => 'Polo sans col',         'slug' => 'polo-sans-col',         'description' => 'Hauts'],
-            ['nom' => 'Polo cardigan',         'slug' => 'polo-cardigan',         'description' => 'Hauts'],
-            ['nom' => 'Déambré',               'slug' => 'deambre',               'description' => 'Hauts'],
+            ['nom' => 'Polo cartigan',         'slug' => 'polo-cartigan',         'description' => 'Hauts'],
+            ['nom' => 'Démanbré',               'slug' => 'demanbre',               'description' => 'Hauts'],
+            ['nom' => 'Body',       'slug' => 'body',       'description' => 'Hauts'],
             ['nom' => 'Débardeur',             'slug' => 'debardeur',             'description' => 'Hauts'],
             // Chemises & Vestes
             ['nom' => 'Chemise simple',        'slug' => 'chemise-simple',        'description' => 'Chemises & Vestes'],
+            ['nom' => 'surchemise',    'slug' => 'surchemise',      'description' => 'Chemises & Vestes'],
             ['nom' => 'Chemise croppée',       'slug' => 'chemise-crope',         'description' => 'Chemises & Vestes'],
             ['nom' => 'Djaket',                'slug' => 'djaket',                'description' => 'Chemises & Vestes'],
             ['nom' => 'Doudoune',              'slug' => 'doudoune',              'description' => 'Chemises & Vestes'],
@@ -31,10 +33,11 @@ return new class extends Migration
             ['nom' => 'Complet-culotte',       'slug' => 'complet-culotte',       'description' => 'Tenues'],
             ['nom' => 'Complet-pantalon',      'slug' => 'complet-pantalon',      'description' => 'Tenues'],
             ['nom' => 'Complet-pull',          'slug' => 'complet-pull',          'description' => 'Tenues'],
+            ['nom' => 'Complet-sky',       'slug' => 'complet-sky',       'description' => 'Tenues'],
             ['nom' => 'Complet sous-vêtement', 'slug' => 'complet-sous-vetement', 'description' => 'Tenues'],
             // Pulls & Maillots
             ['nom' => 'Pull simple',           'slug' => 'pull-simple',           'description' => 'Pulls & Maillots'],
-            ['nom' => 'Pull cardigan',         'slug' => 'pull-cardigan',         'description' => 'Pulls & Maillots'],
+            ['nom' => 'Pull cartigan',         'slug' => 'pull-cartigan',         'description' => 'Pulls & Maillots'],
             ['nom' => 'Maillot de foot',       'slug' => 'maillot-foot',          'description' => 'Pulls & Maillots'],
             ['nom' => 'Maillot de basket',     'slug' => 'maillot-basket',        'description' => 'Pulls & Maillots'],
             // Bas
