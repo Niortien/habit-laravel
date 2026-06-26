@@ -32,6 +32,7 @@ Route::prefix('v1')->group(function () {
         Route::post('produits',                        [ProduitController::class, 'store']);
         Route::patch('produits/{id}',                  [ProduitController::class, 'update']);
         Route::delete('produits/{id}',                 [ProduitController::class, 'destroy']);
+        Route::post('produits/{id}/variantes',           [ProduitController::class, 'addVariante']);
         Route::post('produits/{id}/images',            [ProduitController::class, 'addImage']);
         Route::delete('produits/{id}/images/{imageId}',[ProduitController::class, 'removeImage']);
         Route::get('produits/{id}/mouvements',         [ProduitController::class, 'mouvements']);

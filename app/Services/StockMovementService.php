@@ -20,7 +20,7 @@ class StockMovementService
     ): MouvementStock {
         $variante = Variante::findOrFail($varianteId);
 
-        $sign = in_array($type, ['ENTREE', 'RETOUR'], true) ? 1 : -1;
+        $sign = in_array($type, ['ENTREE', 'RETOUR', 'AJUSTEMENT'], true) ? 1 : -1;
         $newStock = $variante->quantite_stock + ($sign * $quantite);
 
         if ($newStock < 0) {

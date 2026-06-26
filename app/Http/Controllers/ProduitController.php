@@ -139,6 +139,7 @@ class ProduitController extends Controller
             'image_url'    => $imageUrl,
         ]);
 
+        
         if (!empty($data['variantes'])) {
             $boutiqueIds = [];
             if ($request->filled('boutiqueIds')) {
@@ -179,6 +180,7 @@ class ProduitController extends Controller
         $data = $request->validate([
             'nom'            => 'sometimes|string',
             'description'    => 'sometimes|nullable|string',
+            'categorieId'    => 'sometimes|uuid|exists:categories,id',
             'prixVente'      => 'sometimes|numeric|min:0',
             'prixAchat'      => 'sometimes|numeric|min:0',
             'imageUrl'       => 'sometimes|nullable|string',
@@ -198,9 +200,9 @@ class ProduitController extends Controller
         }
 
         $map = [
-            'nom' => 'nom', 'description' => 'description', 'prixVente' => 'prix_vente',
-            'prixAchat' => 'prix_achat', 'imageUrl' => 'image_url', 'isActif' => 'is_actif',
-            'enPromo' => 'en_promo', 'prixPromo' => 'prix_promo',
+            'nom' => 'nom', 'description' => 'description', 'categorieId' => 'categorie_id',
+            'prixVente' => 'prix_vente', 'prixAchat' => 'prix_achat', 'imageUrl' => 'image_url',
+            'isActif' => 'is_actif', 'enPromo' => 'en_promo', 'prixPromo' => 'prix_promo',
             'dateDebutPromo' => 'date_debut_promo', 'dateFinPromo' => 'date_fin_promo',
         ];
 
@@ -211,6 +213,31 @@ class ProduitController extends Controller
 
         $produit->update($update);
         return $this->success($produit->fresh()->load(['categorie', 'variantes', 'images']));
+    }
+
+    public function addVariante(Request $request, string $id): JsonResponse
+    {
+        $produit = Produit::find($id);
+        if (!$produit) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
+
+        $data = $request->validate([
+            'taille'        => 'required|string',
+            'couleur'       => 'required|string',
+            'quantiteStock' => 'sometimes|integer|min:0',
+            'seuilAlerte'   => 'sometimes|integer|min:0',
+            'boutiqueId'    => 'sometimes|nullable|uuid|exists:boutiques,id',
+        ]);
+
+        $variante = Variante::create([
+            'produit_id'     => $produit->id,
+            'boutique_id'    => $data['boutiqueId'] ?? null,
+            'taille'         => $data['taille'],
+            'couleur'        => $data['couleur'],
+            'quantite_stock' => $data['quantiteStock'] ?? 0,
+            'seuil_alerte'   => $data['seuilAlerte'] ?? 5,
+        ]);
+
+        return $this->success($variante, 201);
     }
 
     /**
@@ -233,8 +260,18 @@ class ProduitController extends Controller
         $produit = Produit::find($id);
         if (!$produit) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
 
-        $request->validate(['file' => 'required|image|max:10240']);
-        $url = $this->cloudinary->uploadFile($request->file('file')->getRealPath());
+        $data = $request->validate(['url' => 'required|string']);
+
+        if (str_starts_with($data['url'], 'data:')) {
+            try {
+                $url = $this->cloudinary->uploadBase64($data['url']);
+            } catch (\RuntimeException $e) {
+                abort(422, 'IMAGE_UPLOAD_FAILED: ' . $e->getMessage());
+            }
+        } else {
+            $url = $data['url'];
+        }
+
         $ordre = ProduitImage::where('produit_id', $id)->max('ordre') + 1;
         $image = ProduitImage::create(['produit_id' => $id, 'url' => $url, 'ordre' => $ordre]);
 
