@@ -22,7 +22,9 @@ class CategorieController extends Controller
 
     public function index(): JsonResponse
     {
-        $categories = Categorie::orderBy('description')->orderBy('nom')->get();
+        $categories = Cache::remember('categories.all', 3600, fn () =>
+            Categorie::orderBy('description')->orderBy('nom')->get()
+        );
         return $this->success($categories);
     }
 

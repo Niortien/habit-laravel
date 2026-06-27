@@ -148,17 +148,25 @@ class ProduitController extends Controller
             if (empty($boutiqueIds)) {
                 $boutiqueIds = Boutique::pluck('id')->toArray();
             }
+            $now = now();
+            $toInsert = [];
             foreach ($data['variantes'] as $v) {
-                foreach ($boutiqueIds as $boutiqueId) {
-                    Variante::create([
+                foreach ($boutiqueIds as $bId) {
+                    $toInsert[] = [
+                        'id'             => (string) Str::uuid(),
                         'produit_id'     => $produit->id,
-                        'boutique_id'    => $boutiqueId,
+                        'boutique_id'    => $bId,
                         'taille'         => $v['taille'],
                         'couleur'        => $v['couleur'],
                         'quantite_stock' => $v['quantiteStock'],
                         'seuil_alerte'   => $v['seuilAlerte'] ?? 5,
-                    ]);
+                        'created_at'     => $now,
+                        'updated_at'     => $now,
+                    ];
                 }
+            }
+            if ($toInsert) {
+                Variante::insert($toInsert);
             }
         }
 

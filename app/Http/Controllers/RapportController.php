@@ -105,12 +105,15 @@ class RapportController extends Controller
         $dateDebut  = $request->get('dateDebut', now()->subDays(30)->toDateString());
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
-        $top = MouvementStock::selectRaw('variante_id, SUM(ABS(quantite)) as totalVendu')
-            ->where('type', 'SORTIE')
-            ->where('created_at', '>=', $dateDebut)
-            ->where('created_at', '<=', $dateFin . ' 23:59:59')
-            ->when($boutiqueId, fn($q) => $q->whereHas('variante', fn($v) => $v->where('boutique_id', $boutiqueId)))
-            ->groupBy('variante_id')
+        $top = MouvementStock::selectRaw('mouvement_stocks.variante_id, SUM(ABS(mouvement_stocks.quantite)) as totalVendu')
+            ->where('mouvement_stocks.type', 'SORTIE')
+            ->where('mouvement_stocks.created_at', '>=', $dateDebut)
+            ->where('mouvement_stocks.created_at', '<=', $dateFin . ' 23:59:59')
+            ->when($boutiqueId, fn($q) => $q
+                ->join('variantes as vf', 'vf.id', '=', 'mouvement_stocks.variante_id')
+                ->where('vf.boutique_id', $boutiqueId)
+            )
+            ->groupBy('mouvement_stocks.variante_id')
             ->orderByDesc('totalVendu')
             ->limit(10)
             ->with('variante.produit')
@@ -217,11 +220,14 @@ class RapportController extends Controller
             ->toArray();
 
         // Top 5 produits — 7 derniers jours
-        $topRaw = MouvementStock::selectRaw('variante_id, SUM(ABS(quantite)) as totalVendu')
-            ->where('type', 'SORTIE')
-            ->where('created_at', '>=', now()->subDays(6)->startOfDay())
-            ->when($boutiqueId, fn($q) => $q->whereHas('variante', fn($v) => $v->where('boutique_id', $boutiqueId)))
-            ->groupBy('variante_id')
+        $topRaw = MouvementStock::selectRaw('mouvement_stocks.variante_id, SUM(ABS(mouvement_stocks.quantite)) as totalVendu')
+            ->where('mouvement_stocks.type', 'SORTIE')
+            ->where('mouvement_stocks.created_at', '>=', now()->subDays(6)->startOfDay())
+            ->when($boutiqueId, fn($q) => $q
+                ->join('variantes as vf', 'vf.id', '=', 'mouvement_stocks.variante_id')
+                ->where('vf.boutique_id', $boutiqueId)
+            )
+            ->groupBy('mouvement_stocks.variante_id')
             ->orderByDesc('totalVendu')
             ->limit(5)
             ->with('variante.produit')
@@ -300,6 +306,7 @@ class RapportController extends Controller
             ->where('created_at', '>=', $dateDebut)
             ->where('created_at', '<=', $dateFin . ' 23:59:59')
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+            ->limit(2000)
             ->get();
 
         $rows = [['Référence', 'Type', 'Total', 'Date', 'Vendeur']];
@@ -334,6 +341,7 @@ class RapportController extends Controller
             ->where('created_at', '>=', $dateDebut)
             ->where('created_at', '<=', $dateFin . ' 23:59:59')
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+            ->limit(2000)
             ->get();
 
         $pdf = Pdf::loadView('rapports.ventes', [
