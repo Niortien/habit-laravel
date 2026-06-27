@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\NotFoundException;
 use App\Http\Traits\ApiResponse;
-use App\Models\Boutique;
 use App\Models\Categorie;
 use App\Models\MouvementStock;
 use App\Models\Produit;
@@ -141,12 +140,13 @@ class ProduitController extends Controller
 
         
         if (!empty($data['variantes'])) {
-            $boutiqueIds = [];
+            // [null] = catalogue global (boutique_id null) quand aucune boutique sélectionnée
+            $boutiqueIds = [null];
             if ($request->filled('boutiqueIds')) {
-                $boutiqueIds = array_filter(explode(',', $request->string('boutiqueIds')));
-            }
-            if (empty($boutiqueIds)) {
-                $boutiqueIds = Boutique::pluck('id')->toArray();
+                $parsed = array_values(array_filter(explode(',', $request->string('boutiqueIds'))));
+                if (!empty($parsed)) {
+                    $boutiqueIds = $parsed;
+                }
             }
             $now = now();
             $toInsert = [];
