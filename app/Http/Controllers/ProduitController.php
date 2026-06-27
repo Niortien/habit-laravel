@@ -259,8 +259,8 @@ class ProduitController extends Controller
     {
         $produit = Produit::find($id);
         if (!$produit) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
-        $produit->update(['is_actif' => false]);
-        return $this->success($produit);
+        $produit->delete();
+        return $this->success(['message' => 'Produit supprimé', 'id' => $id]);
     }
 
     public function addImage(Request $request, string $id): JsonResponse

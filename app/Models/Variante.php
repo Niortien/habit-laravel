@@ -20,6 +20,12 @@ class Variante extends Model
     {
         parent::boot();
         static::creating(fn($m) => $m->id = (string) Str::uuid());
+
+        static::deleting(function (Variante $variante) {
+            $variante->lignesEntree()->delete();
+            $variante->lignesSortie()->delete();
+            $variante->mouvements()->delete();
+        });
     }
 
     public function produit(): BelongsTo { return $this->belongsTo(Produit::class); }

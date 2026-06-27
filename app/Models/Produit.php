@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CloudinaryService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,6 +35,24 @@ class Produit extends Model
     {
         parent::boot();
         static::creating(fn($m) => $m->id = (string) Str::uuid());
+
+        static::deleting(function (Produit $produit) {
+            $cloudinary = app(CloudinaryService::class);
+
+            // Supprimer les images Cloudinary + enregistrements
+            foreach ($produit->images as $image) {
+                $cloudinary->deleteByUrl($image->url);
+            }
+            $produit->images()->delete();
+
+            // Supprimer l'image principale si hébergée sur Cloudinary
+            if ($produit->image_url && str_contains($produit->image_url, 'cloudinary')) {
+                $cloudinary->deleteByUrl($produit->image_url);
+            }
+
+            // Supprimer les variantes (cascade : lignes entree/sortie + mouvements)
+            $produit->variantes->each->delete();
+        });
     }
 
     public function categorie(): BelongsTo { return $this->belongsTo(Categorie::class); }

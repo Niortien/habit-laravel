@@ -19,6 +19,33 @@ class Boutique extends Model
     {
         parent::boot();
         static::creating(fn($m) => $m->id = (string) Str::uuid());
+
+        static::deleting(function (Boutique $boutique) {
+            // Détacher les utilisateurs sans les supprimer
+            User::where('boutique_id', $boutique->id)->update(['boutique_id' => null]);
+
+            // Variantes → cascade (lignes entree/sortie + mouvements)
+            $boutique->variantes->each->delete();
+
+            // Entrees → lignes (déjà supprimées par variantes, nettoyage des orphelines)
+            $boutique->entrees->each(function (Entree $entree) {
+                $entree->lignes()->delete();
+                $entree->delete();
+            });
+
+            // Sorties → lignes + transaction liée
+            $boutique->sorties->each(function (Sortie $sortie) {
+                $sortie->lignes()->delete();
+                $sortie->transaction()->delete();
+                $sortie->delete();
+            });
+
+            // Sessions caisse → transactions
+            $boutique->caisseSessions->each(function (CaisseSession $session) {
+                $session->transactions()->delete();
+                $session->delete();
+            });
+        });
     }
 
     public function users(): HasMany { return $this->hasMany(User::class); }
