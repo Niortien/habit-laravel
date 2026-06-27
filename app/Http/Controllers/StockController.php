@@ -34,7 +34,7 @@ class StockController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $q = Variante::with(['produit.categorie', 'boutique']);
+        $q = Variante::with(['produit.categorie', 'boutique'])->whereHas('produit');
 
         if ($request->filled('categorieId')) {
             $q->whereHas('produit', fn($p) => $p->where('categorie_id', $request->categorieId));
@@ -60,6 +60,7 @@ class StockController extends Controller
     public function alertes(Request $request): JsonResponse
     {
         $q = Variante::with(['produit.categorie', 'boutique'])
+            ->whereHas('produit')
             ->whereColumn('quantite_stock', '<=', 'seuil_alerte');
 
         if ($request->filled('boutiqueId')) $q->where('boutique_id', $request->boutiqueId);
