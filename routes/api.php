@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BoutiqueController;
+use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CaisseController;
 use App\Http\Controllers\EntreeController;
 use App\Http\Controllers\ProduitController;
@@ -83,6 +84,12 @@ Route::prefix('v1')->group(function () {
 
         // ── Admin-only ──────────────────────────────────────────────────────
         Route::middleware('role:ADMIN')->group(function () {
+
+            // Catégories (CRUD admin)
+            Route::get('categories',         [CategorieController::class, 'index']);
+            Route::post('categories',        [CategorieController::class, 'store']);
+            Route::patch('categories/{id}',  [CategorieController::class, 'update']);
+            Route::delete('categories/{id}', [CategorieController::class, 'destroy']);
 
             // Users
             Route::get('users',         [UserController::class, 'index']);
