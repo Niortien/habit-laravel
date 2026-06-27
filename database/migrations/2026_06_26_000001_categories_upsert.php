@@ -67,12 +67,20 @@ return new class extends Migration
         ];
 
         foreach ($catDefs as $cat) {
-            DB::statement(
-                'INSERT INTO categories (id, nom, slug, description)
-                 VALUES (?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE nom = VALUES(nom), description = VALUES(description)',
-                [(string) Str::uuid(), $cat['nom'], $cat['slug'], $cat['description']]
-            );
+            $existing = DB::table('categories')->where('slug', $cat['slug'])->first();
+            if ($existing) {
+                DB::table('categories')->where('slug', $cat['slug'])->update([
+                    'nom'         => $cat['nom'],
+                    'description' => $cat['description'],
+                ]);
+            } else {
+                DB::table('categories')->insert([
+                    'id'          => (string) Str::uuid(),
+                    'nom'         => $cat['nom'],
+                    'slug'        => $cat['slug'],
+                    'description' => $cat['description'],
+                ]);
+            }
         }
 
         Cache::forget('categories.all');
