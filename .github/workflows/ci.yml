@@ -91,11 +91,11 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             cd /home/u526846542/domains/dri-vale.org/public_html
+            php artisan down --retry=10
             git pull origin main
             HOME=/home/u526846542 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
-            php artisan config:clear
-            php artisan cache:clear
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            php artisan up
