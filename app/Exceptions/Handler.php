@@ -13,6 +13,14 @@ class Handler extends ExceptionHandler
 {
     protected $dontFlash = ['current_password', 'password', 'password_confirmation'];
 
+    /**
+     * Domain exceptions are expected business-logic outcomes already rendered
+     * as 4xx JSON responses, so they must not be logged as errors.
+     */
+    protected $dontReport = [
+        DomainException::class,
+    ];
+
     public function register(): void
     {
         $this->renderable(function (Throwable $e, Request $request) {
