@@ -55,8 +55,11 @@ class AuthController extends Controller
             throw new ValidationException('Identifiants invalides', 'AUTH_INVALID_CREDENTIALS');
         }
 
-        $accessToken  = JWTAuth::fromUser($user);
+        $accessToken = JWTAuth::fromUser($user);
+
+        JWTAuth::factory()->setTTL(config('jwt.refresh_ttl'));
         $refreshToken = JWTAuth::fromUser($user, ['token_type' => 'refresh']);
+        JWTAuth::factory()->setTTL(config('jwt.ttl'));
 
         return $this->success([
             'accessToken'  => $accessToken,
