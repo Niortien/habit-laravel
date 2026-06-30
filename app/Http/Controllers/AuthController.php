@@ -55,6 +55,8 @@ class AuthController extends Controller
             throw new ValidationException('Identifiants invalides', 'AUTH_INVALID_CREDENTIALS');
         }
 
+        $user->load('boutique');
+
         $accessToken = JWTAuth::fromUser($user);
 
         JWTAuth::factory()->setTTL(config('jwt.refresh_ttl'));
@@ -65,10 +67,11 @@ class AuthController extends Controller
             'accessToken'  => $accessToken,
             'refreshToken' => $refreshToken,
             'user'         => [
-                'id'         => $user->id,
-                'email'      => $user->email,
-                'role'       => $user->role,
-                'boutiqueId' => $user->boutique_id,
+                'id'           => $user->id,
+                'email'        => $user->email,
+                'role'         => $user->role,
+                'boutiqueId'   => $user->boutique_id,
+                'boutiqueName' => $user->boutique?->nom ?? null,
             ],
         ]);
     }
