@@ -85,9 +85,9 @@ jobs:
       - name: Déploiement via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 145.79.20.168
-          port: 65002
-          username: u526846542
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             cd /home/u526846542/domains/dri-vale.org/public_html
