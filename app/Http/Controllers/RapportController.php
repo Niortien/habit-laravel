@@ -13,6 +13,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -43,60 +44,66 @@ class RapportController extends Controller
         $dateDebut  = $request->get('dateDebut', now()->subDays(30)->toDateString());
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
-        $format = match ($groupBy) {
-            'semaine' => '%Y-%u',
-            'mois'    => '%Y-%m',
-            default   => '%Y-%m-%d',
-        };
+        $data = Cache::remember("ventes:{$boutiqueId}:{$groupBy}:{$dateDebut}:{$dateFin}", 300, function () use ($boutiqueId, $groupBy, $dateDebut, $dateFin) {
+            $format = match ($groupBy) {
+                'semaine' => '%Y-%u',
+                'mois'    => '%Y-%m',
+                default   => '%Y-%m-%d',
+            };
 
-        $q = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '{$format}') as periode, SUM(transactions.montant) as totalVentes, COUNT(*) as nombreTransactions")
-            ->where('transactions.created_at', '>=', $dateDebut)
-            ->where('transactions.created_at', '<=', $dateFin . ' 23:59:59');
+            $q = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '{$format}') as periode, SUM(transactions.montant) as totalVentes, COUNT(*) as nombreTransactions")
+                ->where('transactions.created_at', '>=', $dateDebut)
+                ->where('transactions.created_at', '<=', $dateFin . ' 23:59:59');
 
-        if ($boutiqueId) {
-            $q->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
-              ->where('cs.boutique_id', $boutiqueId);
-        }
+            if ($boutiqueId) {
+                $q->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
+                  ->where('cs.boutique_id', $boutiqueId);
+            }
 
-        $transactions = $q->groupBy('periode')
-            ->orderBy('periode')
-            ->get()
-            ->map(fn($row) => [
-                'periode'            => $row->periode,
-                'totalVentes'        => number_format((float) $row->totalVentes, 2, '.', ''),
-                'nombreTransactions' => (int) $row->nombreTransactions,
-                'nombreSorties'      => (int) $row->nombreTransactions,
-            ]);
+            return $q->groupBy('periode')
+                ->orderBy('periode')
+                ->get()
+                ->map(fn($row) => [
+                    'periode'            => $row->periode,
+                    'totalVentes'        => number_format((float) $row->totalVentes, 2, '.', ''),
+                    'nombreTransactions' => (int) $row->nombreTransactions,
+                    'nombreSorties'      => (int) $row->nombreTransactions,
+                ]);
+        });
 
-        return $this->success($transactions);
+        return $this->success($data);
     }
 
     public function stockValeur(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
 
-        $row = \Illuminate\Support\Facades\DB::table('variantes as v')
-            ->join('produits as p', 'v.produit_id', '=', 'p.id')
-            ->where('p.is_actif', true)
-            ->when($boutiqueId, fn($q) => $q->where('v.boutique_id', $boutiqueId))
-            ->selectRaw('
-                COALESCE(SUM(v.quantite_stock * p.prix_achat), 0) as valeurAchat,
-                COALESCE(SUM(v.quantite_stock * p.prix_vente), 0) as valeurVente,
-                COUNT(DISTINCT v.produit_id) as nombreProduits,
-                COUNT(*) as nombreVariantes
-            ')
-            ->first();
+        $data = Cache::remember("stock-valeur:{$boutiqueId}", 300, function () use ($boutiqueId) {
+            $row = \Illuminate\Support\Facades\DB::table('variantes as v')
+                ->join('produits as p', 'v.produit_id', '=', 'p.id')
+                ->where('p.is_actif', true)
+                ->when($boutiqueId, fn($q) => $q->where('v.boutique_id', $boutiqueId))
+                ->selectRaw('
+                    COALESCE(SUM(v.quantite_stock * p.prix_achat), 0) as valeurAchat,
+                    COALESCE(SUM(v.quantite_stock * p.prix_vente), 0) as valeurVente,
+                    COUNT(DISTINCT v.produit_id) as nombreProduits,
+                    COUNT(*) as nombreVariantes
+                ')
+                ->first();
 
-        $valeurAchat = number_format((float) $row->valeurAchat, 2, '.', '');
-        $valeurVente = number_format((float) $row->valeurVente, 2, '.', '');
+            $valeurAchat = number_format((float) $row->valeurAchat, 2, '.', '');
+            $valeurVente = number_format((float) $row->valeurVente, 2, '.', '');
 
-        return $this->success([
-            'valeurTotaleAchat'  => $valeurAchat,
-            'valeurTotaleVente'  => $valeurVente,
-            'beneficePotentiel'  => number_format((float) $valeurVente - (float) $valeurAchat, 2, '.', ''),
-            'nombreVariantes'    => (int) $row->nombreVariantes,
-            'nombreProduits'     => (int) $row->nombreProduits,
-        ]);
+            return [
+                'valeurTotaleAchat'  => $valeurAchat,
+                'valeurTotaleVente'  => $valeurVente,
+                'beneficePotentiel'  => number_format((float) $valeurVente - (float) $valeurAchat, 2, '.', ''),
+                'nombreVariantes'    => (int) $row->nombreVariantes,
+                'nombreProduits'     => (int) $row->nombreProduits,
+            ];
+        });
+
+        return $this->success($data);
     }
 
     public function topProduits(Request $request): JsonResponse
@@ -200,6 +207,17 @@ class RapportController extends Controller
         $dateDebut  = $request->get('dateDebut', now()->subDays(6)->toDateString());
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
+        $cacheKey = "dashboard:{$boutiqueId}:{$dateDebut}:{$dateFin}";
+        $data     = Cache::remember($cacheKey, 300, function () use ($boutiqueId, $dateDebut, $dateFin) {
+            return $this->buildDashboard($boutiqueId, $dateDebut, $dateFin);
+        });
+
+        return $this->success($data);
+    }
+
+    private function buildDashboard(?string $boutiqueId, string $dateDebut, string $dateFin): array
+    {
+
         // Ventes groupées par jour sur la période
         $ventesQ = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '%Y-%m-%d') as periode, SUM(transactions.montant) as totalVentes, COUNT(*) as nombreTransactions")
             ->where('transactions.created_at', '>=', $dateDebut)
@@ -272,7 +290,7 @@ class RapportController extends Controller
         $totalVentesAllTime = (int) $diagCaisse->totalVentesAllTime;
         $totalVentes7j   = (int) $diagCaisse->totalVentes7j;
 
-        return $this->success([
+        return [
             'periode'     => ['debut' => $dateDebut, 'fin' => $dateFin],
             'ventes'      => $ventesRows,
             'topProduits' => $topProduits,
@@ -285,7 +303,7 @@ class RapportController extends Controller
                 'sessionsOuvertes'  => $sessionsOuvertes,
                 'hasData'           => $totalProduits > 0 || $totalEntrees > 0,
             ],
-        ]);
+        ];
     }
 
     /**
