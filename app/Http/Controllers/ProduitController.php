@@ -57,7 +57,7 @@ class ProduitController extends Controller
         }
 
         $page  = max(1, (int) $request->get('page', 1));
-        $limit = min(100, max(1, (int) $request->get('limit', 20)));
+        $limit = min(200, max(1, (int) $request->get('limit', 20)));
         $total = $q->count();
         $data  = $q->skip(($page - 1) * $limit)->take($limit)->orderBy('created_at', 'desc')->get();
 
