@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Traits\ApiResponse;
 use App\Models\Entree;
+use App\Models\LigneSortie;
 use App\Models\MouvementStock;
 use App\Models\Produit;
 use App\Models\Sortie;
@@ -112,15 +113,16 @@ class RapportController extends Controller
         $dateDebut  = $request->get('dateDebut', now()->subDays(30)->toDateString());
         $dateFin    = $request->get('dateFin', now()->toDateString());
 
-        $top = MouvementStock::selectRaw('mouvement_stocks.variante_id, SUM(ABS(mouvement_stocks.quantite)) as totalVendu')
-            ->where('mouvement_stocks.type', 'SORTIE')
-            ->where('mouvement_stocks.created_at', '>=', $dateDebut)
-            ->where('mouvement_stocks.created_at', '<=', $dateFin . ' 23:59:59')
-            ->when($boutiqueId, fn($q) => $q
-                ->join('variantes as vf', 'vf.id', '=', 'mouvement_stocks.variante_id')
-                ->where('vf.boutique_id', $boutiqueId)
-            )
-            ->groupBy('mouvement_stocks.variante_id')
+        $top = LigneSortie::selectRaw('
+                ligne_sorties.variante_id,
+                SUM(ligne_sorties.quantite) as totalVendu,
+                SUM(ligne_sorties.quantite * ligne_sorties.prix_unitaire) as montantTotal
+            ')
+            ->join('sorties', 'sorties.id', '=', 'ligne_sorties.sortie_id')
+            ->where('sorties.created_at', '>=', $dateDebut)
+            ->where('sorties.created_at', '<=', $dateFin . ' 23:59:59')
+            ->when($boutiqueId, fn($q) => $q->where('sorties.boutique_id', $boutiqueId))
+            ->groupBy('ligne_sorties.variante_id')
             ->orderByDesc('totalVendu')
             ->limit(10)
             ->with('variante.produit')
@@ -132,9 +134,7 @@ class RapportController extends Controller
                 'nom'            => $r->variante->produit->nom,
                 'sku'            => $r->variante->produit->sku,
                 'quantiteTotale' => (int) $r->totalVendu,
-                'montantTotal'   => number_format(
-                    (float) $r->totalVendu * (float) $r->variante->produit->prix_vente, 2, '.', ''
-                ),
+                'montantTotal'   => number_format((float) $r->montantTotal, 2, '.', ''),
             ])
             ->values();
 
@@ -237,15 +237,16 @@ class RapportController extends Controller
             ->values()
             ->toArray();
 
-        // Top 5 produits — 7 derniers jours
-        $topRaw = MouvementStock::selectRaw('mouvement_stocks.variante_id, SUM(ABS(mouvement_stocks.quantite)) as totalVendu')
-            ->where('mouvement_stocks.type', 'SORTIE')
-            ->where('mouvement_stocks.created_at', '>=', now()->subDays(6)->startOfDay())
-            ->when($boutiqueId, fn($q) => $q
-                ->join('variantes as vf', 'vf.id', '=', 'mouvement_stocks.variante_id')
-                ->where('vf.boutique_id', $boutiqueId)
-            )
-            ->groupBy('mouvement_stocks.variante_id')
+        // Top 5 produits — 7 derniers jours (basé sur lignes_sorties, pas mouvements)
+        $topRaw = LigneSortie::selectRaw('
+                ligne_sorties.variante_id,
+                SUM(ligne_sorties.quantite) as totalVendu,
+                SUM(ligne_sorties.quantite * ligne_sorties.prix_unitaire) as montantTotal
+            ')
+            ->join('sorties', 'sorties.id', '=', 'ligne_sorties.sortie_id')
+            ->where('sorties.created_at', '>=', now()->subDays(6)->startOfDay())
+            ->when($boutiqueId, fn($q) => $q->where('sorties.boutique_id', $boutiqueId))
+            ->groupBy('ligne_sorties.variante_id')
             ->orderByDesc('totalVendu')
             ->limit(5)
             ->with('variante.produit')
@@ -257,9 +258,7 @@ class RapportController extends Controller
                 'nom'            => $r->variante->produit->nom,
                 'sku'            => $r->variante->produit->sku,
                 'quantiteTotale' => (int) $r->totalVendu,
-                'montantTotal'   => number_format(
-                    (float) $r->totalVendu * (float) $r->variante->produit->prix_vente, 2, '.', ''
-                ),
+                'montantTotal'   => number_format((float) $r->montantTotal, 2, '.', ''),
             ])
             ->values()
             ->toArray();
