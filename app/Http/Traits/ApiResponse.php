@@ -12,7 +12,7 @@ trait ApiResponse
             'data'      => $data,
             'meta'      => null,
             'timestamp' => now()->toISOString(),
-        ], $status);
+        ], $status)->header('Cache-Control', 'private, max-age=60, must-revalidate');
     }
 
     protected function paginated(mixed $data, int $total, int $page, int $limit): JsonResponse
@@ -26,6 +26,6 @@ trait ApiResponse
                 'pageCount' => (int) ceil($total / $limit),
             ],
             'timestamp' => now()->toISOString(),
-        ]);
+        ])->header('Cache-Control', 'private, max-age=60, must-revalidate');
     }
 }
