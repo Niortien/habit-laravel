@@ -60,13 +60,14 @@ class SortieController extends Controller
     }
 
     /**
-     * @OA\Post(path="/sorties", tags={"Sorties"}, summary="Créer une sortie / vente", security={{"bearerAuth":{}}},
+     * @OA\Post(path="/sorties", tags={"Sorties"}, summary="Créer une sortie / vente / dépense", security={{"bearerAuth":{}}},
      *     @OA\RequestBody(required=true,
-     *         @OA\JsonContent(required={"type","lignes"},
+     *         @OA\JsonContent(required={"type"},
      *             @OA\Property(property="type", type="string", enum={"VENTE","PERTE","DON","RETOUR_FOURNISSEUR","DEPENSE"}),
      *             @OA\Property(property="remiseMontant", type="number", nullable=true),
-     *             @OA\Property(property="notes", type="string", nullable=true),
-     *             @OA\Property(property="lignes", type="array", @OA\Items(type="object",
+     *             @OA\Property(property="notes", type="string", nullable=true, description="Description de la dépense (requis si type=DEPENSE)"),
+     *             @OA\Property(property="montant", type="number", nullable=true, description="Montant de la dépense (requis si type=DEPENSE)"),
+     *             @OA\Property(property="lignes", type="array", nullable=true, description="Requis sauf si type=DEPENSE", @OA\Items(type="object",
      *                 @OA\Property(property="varianteId", type="string", format="uuid"),
      *                 @OA\Property(property="quantite", type="integer"),
      *                 @OA\Property(property="prixUnitaire", type="number")
@@ -81,10 +82,11 @@ class SortieController extends Controller
     {
         $data = $request->validate([
             'type'          => 'required|in:VENTE,PERTE,DON,RETOUR_FOURNISSEUR,DEPENSE',
-            'notes'         => 'sometimes|nullable|string',
+            'notes'         => 'nullable|string|required_if:type,DEPENSE',
+            'montant'       => 'nullable|numeric|min:0.01|required_if:type,DEPENSE',
             'remiseMontant' => 'sometimes|nullable|numeric|min:0',
             'dateOperation' => 'sometimes|nullable|date',
-            'lignes'        => 'required|array|min:1',
+            'lignes'        => 'array|min:1|required_unless:type,DEPENSE',
             'lignes.*.varianteId'    => 'required|uuid',
             'lignes.*.quantite'      => 'required|integer|min:1',
             'lignes.*.prixUnitaire'  => 'required|numeric|min:0',
@@ -92,6 +94,21 @@ class SortieController extends Controller
 
         $boutiqueId = $this->boutiqueId($request);
         $userId     = $request->user()->id;
+
+        if ($data['type'] === 'DEPENSE') {
+            $sortie = Sortie::create([
+                'reference'          => 'SRT-' . strtoupper(Str::random(8)),
+                'type'               => 'DEPENSE',
+                'total_avant_remise' => null,
+                'remise_montant'     => null,
+                'total_montant'      => number_format((float) $data['montant'], 2, '.', ''),
+                'notes'              => $data['notes'],
+                'user_id'            => $userId,
+                'boutique_id'        => $boutiqueId,
+            ]);
+
+            return $this->success($sortie->load(['user', 'boutique']), 201);
+        }
 
         if ($data['type'] === 'VENTE') {
             $session = CaisseSession::where('statut', 'OUVERTE')
