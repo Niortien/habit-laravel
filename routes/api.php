@@ -79,6 +79,7 @@ Route::prefix('v1')->group(function () {
         Route::get('rapports/stock-valeur',     [RapportController::class, 'stockValeur']);
         Route::get('rapports/top-produits',     [RapportController::class, 'topProduits']);
         Route::get('rapports/flux-tresorerie',  [RapportController::class, 'fluxTresorerie']);
+        Route::get('rapports/depenses',         [RapportController::class, 'depenses']);
         Route::get('rapports/export/excel',     [RapportController::class, 'exportExcel']);
         Route::get('rapports/export/pdf',       [RapportController::class, 'exportPdf']);
 

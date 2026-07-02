@@ -141,6 +141,35 @@ class RapportController extends Controller
         return $this->success($result);
     }
 
+    /**
+     * @OA\Get(path="/rapports/depenses", tags={"Rapports"}, summary="Total des depenses sur une periode", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Depenses", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
+    public function depenses(Request $request): JsonResponse
+    {
+        $boutiqueId = $this->boutiqueId($request);
+        $dateDebut  = $request->get('dateDebut', now()->subDays(30)->toDateString());
+        $dateFin    = $request->get('dateFin', now()->toDateString());
+
+        $data = Cache::remember("depenses:{$boutiqueId}:{$dateDebut}:{$dateFin}", 300, function () use ($boutiqueId, $dateDebut, $dateFin) {
+            $q = Sortie::where('type', 'DEPENSE')
+                ->where('created_at', '>=', $dateDebut)
+                ->where('created_at', '<=', $dateFin . ' 23:59:59')
+                ->when($boutiqueId, fn($qq) => $qq->where('boutique_id', $boutiqueId));
+
+            return [
+                'totalDepenses'  => number_format((float) $q->clone()->sum('total_montant'), 2, '.', ''),
+                'nombreDepenses' => (int) $q->clone()->count(),
+            ];
+        });
+
+        return $this->success($data);
+    }
+
     public function fluxTresorerie(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
