@@ -179,4 +179,68 @@ class V2ImprovementsTest extends TestCase
 
         $this->assertDatabaseMissing('boutiques', ['id' => $boutique->id]);
     }
+
+    // ──────────────────── Réattribution de boutique (produit / variante) ────────────────────
+
+    public function test_reassign_boutique_deplace_toutes_les_variantes_du_produit(): void
+    {
+        $this->actingAsAdmin();
+        $mauvaiseBoutique = Boutique::factory()->create();
+        $bonneBoutique    = Boutique::factory()->create();
+        $produit = Produit::factory()->create();
+        Variante::factory()->create(['produit_id' => $produit->id, 'boutique_id' => $mauvaiseBoutique->id, 'taille' => 'M', 'couleur' => 'noir']);
+        Variante::factory()->create(['produit_id' => $produit->id, 'boutique_id' => $mauvaiseBoutique->id, 'taille' => 'L', 'couleur' => 'noir']);
+
+        $response = $this->patchJson("/api/v1/produits/{$produit->id}/boutique", [
+            'boutiqueId' => $bonneBoutique->id,
+        ])->assertStatus(200);
+
+        $response->assertJsonPath('data.movedCount', 2);
+        $this->assertSame(0, Variante::where('produit_id', $produit->id)->where('boutique_id', $mauvaiseBoutique->id)->count());
+        $this->assertSame(2, Variante::where('produit_id', $produit->id)->where('boutique_id', $bonneBoutique->id)->count());
+        $this->assertDatabaseHas('audit_logs', ['entity_type' => 'Produit', 'entity_id' => $produit->id]);
+    }
+
+    public function test_reassign_boutique_signale_les_conflits_sans_les_bloquer(): void
+    {
+        $this->actingAsAdmin();
+        $boutiqueA = Boutique::factory()->create();
+        $boutiqueB = Boutique::factory()->create();
+        $produit = Produit::factory()->create();
+        $aDeplacer = Variante::factory()->create(['produit_id' => $produit->id, 'boutique_id' => $boutiqueA->id, 'taille' => 'M', 'couleur' => 'noir']);
+        // Une variante identique (M/noir) existe déjà dans la boutique destination → conflit
+        Variante::factory()->create(['produit_id' => $produit->id, 'boutique_id' => $boutiqueB->id, 'taille' => 'M', 'couleur' => 'noir']);
+
+        $response = $this->patchJson("/api/v1/produits/{$produit->id}/boutique", [
+            'boutiqueId' => $boutiqueB->id,
+        ])->assertStatus(200);
+
+        $response->assertJsonPath('data.movedCount', 0);
+        $response->assertJsonCount(1, 'data.conflicts');
+        $this->assertSame($boutiqueA->id, $aDeplacer->fresh()->boutique_id);
+    }
+
+    public function test_variante_update_refuse_si_conflit_dans_boutique_destination(): void
+    {
+        $this->actingAsAdmin();
+        $boutiqueA = Boutique::factory()->create();
+        $boutiqueB = Boutique::factory()->create();
+        $produit = Produit::factory()->create();
+        $source = Variante::factory()->create(['produit_id' => $produit->id, 'boutique_id' => $boutiqueA->id, 'taille' => 'M', 'couleur' => 'noir']);
+        Variante::factory()->create(['produit_id' => $produit->id, 'boutique_id' => $boutiqueB->id, 'taille' => 'M', 'couleur' => 'noir']);
+
+        $this->patchJson("/api/v1/variantes/{$source->id}", ['boutiqueId' => $boutiqueB->id])
+            ->assertStatus(409);
+    }
+
+    public function test_variante_update_reassigne_la_boutique_sans_conflit(): void
+    {
+        $this->actingAsAdmin();
+        $boutique = Boutique::factory()->create();
+        $variante = Variante::factory()->create(['boutique_id' => null]);
+
+        $this->patchJson("/api/v1/variantes/{$variante->id}", ['boutiqueId' => $boutique->id])
+            ->assertStatus(200)
+            ->assertJsonPath('data.boutiqueId', $boutique->id);
+    }
 }

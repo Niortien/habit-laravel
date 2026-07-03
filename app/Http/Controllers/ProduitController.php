@@ -235,6 +235,65 @@ class ProduitController extends Controller
         return $this->success($produit->fresh()->load(['categorie', 'variantes', 'images']));
     }
 
+    /**
+     * @OA\Patch(path="/produits/{id}/boutique", tags={"Produits"}, summary="Réattribuer toutes les variantes d'un produit à une boutique", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\RequestBody(@OA\JsonContent(@OA\Property(property="boutiqueId", type="string", format="uuid", nullable=true))),
+     *     @OA\Response(response=200, description="Variantes réattribuées", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
+    public function reassignBoutique(Request $request, string $id): JsonResponse
+    {
+        $produit = Produit::find($id);
+        if (!$produit) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
+
+        $data = $request->validate([
+            'boutiqueId' => 'sometimes|nullable|uuid|exists:boutiques,id',
+        ]);
+        $nouvelleBoutiqueId = $data['boutiqueId'] ?? null;
+
+        $variantes = $produit->variantes()->get(['id', 'produit_id', 'boutique_id', 'taille', 'couleur']);
+
+        $deplacees = [];
+        $conflits  = [];
+
+        foreach ($variantes as $variante) {
+            if ($variante->boutique_id === $nouvelleBoutiqueId) continue;
+
+            $conflit = Variante::where('produit_id', $produit->id)
+                ->where('taille', $variante->taille)
+                ->where('couleur', $variante->couleur)
+                ->where('boutique_id', $nouvelleBoutiqueId)
+                ->where('id', '!=', $variante->id)
+                ->exists();
+
+            if ($conflit) {
+                $conflits[] = ['varianteId' => $variante->id, 'taille' => $variante->taille, 'couleur' => $variante->couleur];
+                continue;
+            }
+
+            $variante->update(['boutique_id' => $nouvelleBoutiqueId]);
+            $deplacees[] = $variante->id;
+        }
+
+        if (!empty($deplacees)) {
+            \App\Models\AuditLog::record(
+                $request->user()->id,
+                'PRODUIT_BOUTIQUE_REASSIGN',
+                'Produit',
+                $produit->id,
+                count($deplacees) . " variante(s) de {$produit->nom} réattribuée(s) à la boutique " . ($nouvelleBoutiqueId ?? 'catalogue global')
+                    . (count($conflits) ? ", " . count($conflits) . " en conflit non déplacée(s)" : '')
+            );
+        }
+
+        return $this->success([
+            'movedCount' => count($deplacees),
+            'conflicts'  => $conflits,
+            'produit'    => $produit->fresh()->load(['categorie', 'variantes', 'images']),
+        ]);
+    }
+
     public function addVariante(Request $request, string $id): JsonResponse
     {
         $produit = Produit::find($id);

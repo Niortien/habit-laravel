@@ -36,6 +36,7 @@ Route::prefix('v1')->group(function () {
         // Produits (write)
         Route::post('produits',                        [ProduitController::class, 'store']);
         Route::patch('produits/{id}',                  [ProduitController::class, 'update']);
+        Route::patch('produits/{id}/boutique',         [ProduitController::class, 'reassignBoutique']);
         Route::delete('produits/{id}',                 [ProduitController::class, 'destroy']);
         Route::post('produits/{id}/variantes',           [ProduitController::class, 'addVariante']);
         Route::post('produits/{id}/images',            [ProduitController::class, 'addImage']);

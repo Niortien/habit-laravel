@@ -25,12 +25,29 @@ class VarianteController extends Controller
             'taille'       => 'sometimes|string',
             'couleur'      => 'sometimes|string',
             'seuilAlerte'  => 'sometimes|integer|min:0',
+            'boutiqueId'   => 'sometimes|nullable|uuid|exists:boutiques,id',
         ]);
 
-        $map = ['taille' => 'taille', 'couleur' => 'couleur', 'seuilAlerte' => 'seuil_alerte'];
+        $map = ['taille' => 'taille', 'couleur' => 'couleur', 'seuilAlerte' => 'seuil_alerte', 'boutiqueId' => 'boutique_id'];
         $update = [];
         foreach ($map as $from => $to) {
             if (array_key_exists($from, $data)) $update[$to] = $data[$from];
+        }
+
+        if (array_key_exists('boutique_id', $update) && $update['boutique_id'] !== $variante->boutique_id) {
+            $conflit = Variante::where('produit_id', $variante->produit_id)
+                ->where('taille', $update['taille'] ?? $variante->taille)
+                ->where('couleur', $update['couleur'] ?? $variante->couleur)
+                ->where('boutique_id', $update['boutique_id'])
+                ->where('id', '!=', $variante->id)
+                ->exists();
+
+            if ($conflit) {
+                throw new ConflictException(
+                    'Une variante identique (taille/couleur) existe déjà dans cette boutique',
+                    'VARIANTE_BOUTIQUE_CONFLICT'
+                );
+            }
         }
 
         $variante->update($update);
