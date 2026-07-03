@@ -7,6 +7,7 @@ use App\Http\Traits\ApiResponse;
 use App\Models\Boutique;
 use App\Models\Categorie;
 use App\Models\Entree;
+use App\Models\Fournisseur;
 
 use App\Models\Produit;
 use App\Models\Variante;
@@ -47,6 +48,7 @@ class EntreeController extends Controller
 
         if ($boutiqueId)                  $q->where('boutique_id', $boutiqueId);
         if ($request->filled('fournisseur')) $q->where('fournisseur', 'like', '%'.$request->fournisseur.'%');
+        if ($request->filled('fournisseurId')) $q->where('fournisseur_id', $request->fournisseurId);
         if ($request->filled('dateDebut'))   $q->where('created_at', '>=', $request->dateDebut);
         if ($request->filled('dateFin'))     $q->where('created_at', '<=', $request->dateFin);
 
@@ -99,14 +101,21 @@ class EntreeController extends Controller
         $reference  = 'ENT-' . strtoupper(Str::random(8));
         $totalCout  = '0.00';
 
-        $entree = DB::transaction(function () use ($data, $boutiqueId, $userId, $reference, &$totalCout) {
+        $fournisseurNom = trim($data['fournisseur']);
+        $fournisseur = Fournisseur::firstOrCreate(
+            ['nom' => $fournisseurNom],
+            ['nom' => $fournisseurNom]
+        );
+
+        $entree = DB::transaction(function () use ($data, $boutiqueId, $userId, $reference, $fournisseur, &$totalCout) {
             $entree = Entree::create([
-                'reference'   => $reference,
-                'fournisseur' => $data['fournisseur'],
-                'total_cout'  => '0.00',
-                'notes'       => $data['notes'] ?? null,
-                'user_id'     => $userId,
-                'boutique_id' => $boutiqueId,
+                'reference'      => $reference,
+                'fournisseur'    => $data['fournisseur'],
+                'fournisseur_id' => $fournisseur->id,
+                'total_cout'     => '0.00',
+                'notes'          => $data['notes'] ?? null,
+                'user_id'        => $userId,
+                'boutique_id'    => $boutiqueId,
             ]);
 
             foreach ($data['lignes'] as $ligne) {
@@ -177,6 +186,8 @@ class EntreeController extends Controller
             $entree->delete();
         });
 
+        \App\Models\AuditLog::record($userId, 'ENTREE_DESTROY', 'Entree', $entree->id, 'Suppression entrée ' . $entree->reference);
+
         return $this->success($entree);
     }
 
@@ -203,6 +214,8 @@ class EntreeController extends Controller
             }
             $entree->update(['fournisseur' => '[ANNULÉE] ' . $entree->fournisseur]);
         });
+
+        \App\Models\AuditLog::record($userId, 'ENTREE_ANNULER', 'Entree', $entree->id, 'Annulation entrée ' . $entree->reference);
 
         return $this->success($entree->fresh()->load(['lignes.variante.produit', 'user', 'boutique']));
     }

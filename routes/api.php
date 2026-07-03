@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BoutiqueController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CaisseController;
 use App\Http\Controllers\EntreeController;
+use App\Http\Controllers\FournisseurController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\SortieController;
@@ -16,8 +18,10 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
 
     // ── Auth (public) ──────────────────────────────────────────────────────
-    Route::post('auth/login',   [AuthController::class, 'login']);
-    Route::post('auth/refresh', [AuthController::class, 'refresh']);
+    Route::post('auth/login',           [AuthController::class, 'login'])->middleware('throttle:6,1');
+    Route::post('auth/refresh',         [AuthController::class, 'refresh']);
+    Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:6,1');
+    Route::post('auth/reset-password',  [AuthController::class, 'resetPassword'])->middleware('throttle:6,1');
 
     // ── Public catalogue ───────────────────────────────────────────────────
     Route::get('produits/categories', [ProduitController::class, 'categories']);
@@ -48,21 +52,22 @@ Route::prefix('v1')->group(function () {
         Route::get('stock/alertes',   [StockController::class, 'alertes']);
         Route::get('stock/mouvements',[StockController::class, 'mouvements']);
 
+        // Fournisseurs
+        Route::get('fournisseurs',      [FournisseurController::class, 'index']);
+        Route::get('fournisseurs/{id}', [FournisseurController::class, 'show']);
+        Route::post('fournisseurs',     [FournisseurController::class, 'store']);
+
         // Entrées
         Route::get('entrees',              [EntreeController::class, 'index']);
         Route::get('entrees/{id}',         [EntreeController::class, 'show']);
         Route::post('entrees',             [EntreeController::class, 'store']);
         Route::patch('entrees/{id}',       [EntreeController::class, 'update']);
-        Route::delete('entrees/{id}',      [EntreeController::class, 'destroy']);
-        Route::patch('entrees/{id}/annuler',[EntreeController::class, 'annuler']);
 
         // Sorties
         Route::get('sorties',              [SortieController::class, 'index']);
         Route::get('sorties/{id}',         [SortieController::class, 'show']);
         Route::post('sorties',             [SortieController::class, 'store']);
         Route::patch('sorties/{id}',       [SortieController::class, 'update']);
-        Route::delete('sorties/{id}',      [SortieController::class, 'destroy']);
-        Route::patch('sorties/{id}/annuler',[SortieController::class, 'annuler']);
 
         // Caisse
         Route::get('caisse/sessions',                          [CaisseController::class, 'listSessions']);
@@ -83,11 +88,22 @@ Route::prefix('v1')->group(function () {
         Route::get('rapports/export/excel',     [RapportController::class, 'exportExcel']);
         Route::get('rapports/export/pdf',       [RapportController::class, 'exportPdf']);
 
+        // ── ADMIN + GERANT (lecture élargie, écriture sensible réservée à ADMIN) ─
+        Route::middleware('role:ADMIN,GERANT')->group(function () {
+            Route::get('categories',        [CategorieController::class, 'index']);
+            Route::get('boutiques',         [BoutiqueController::class, 'index']);
+            Route::get('boutiques/{id}',    [BoutiqueController::class, 'show']);
+
+            Route::patch('fournisseurs/{id}',  [FournisseurController::class, 'update']);
+            Route::delete('fournisseurs/{id}', [FournisseurController::class, 'destroy']);
+
+            Route::post('stock/transferts', [StockController::class, 'transferer']);
+        });
+
         // ── Admin-only ──────────────────────────────────────────────────────
         Route::middleware('role:ADMIN')->group(function () {
 
-            // Catégories (CRUD admin)
-            Route::get('categories',         [CategorieController::class, 'index']);
+            // Catégories (écriture admin)
             Route::post('categories',        [CategorieController::class, 'store']);
             Route::patch('categories/{id}',  [CategorieController::class, 'update']);
             Route::delete('categories/{id}', [CategorieController::class, 'destroy']);
@@ -99,12 +115,19 @@ Route::prefix('v1')->group(function () {
             Route::patch('users/{id}',  [UserController::class, 'update']);
             Route::delete('users/{id}', [UserController::class, 'destroy']);
 
-            // Boutiques
-            Route::get('boutiques',         [BoutiqueController::class, 'index']);
+            // Boutiques (écriture admin)
             Route::post('boutiques',        [BoutiqueController::class, 'store']);
-            Route::get('boutiques/{id}',    [BoutiqueController::class, 'show']);
             Route::patch('boutiques/{id}',  [BoutiqueController::class, 'update']);
             Route::delete('boutiques/{id}', [BoutiqueController::class, 'destroy']);
+
+            // Annulation / suppression de mouvements comptables — réservé ADMIN
+            Route::delete('entrees/{id}',        [EntreeController::class, 'destroy']);
+            Route::patch('entrees/{id}/annuler', [EntreeController::class, 'annuler']);
+            Route::delete('sorties/{id}',        [SortieController::class, 'destroy']);
+            Route::patch('sorties/{id}/annuler', [SortieController::class, 'annuler']);
+
+            // Journal d'audit
+            Route::get('audit-logs', [AuditLogController::class, 'index']);
         });
     });
 });

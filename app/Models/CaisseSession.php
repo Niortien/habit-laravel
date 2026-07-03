@@ -16,12 +16,14 @@ class CaisseSession extends Model
 
     protected $fillable = [
         'user_id', 'boutique_id', 'date_ouverture', 'date_fermeture',
-        'montant_ouverture', 'montant_fermeture', 'statut',
+        'montant_ouverture', 'montant_fermeture', 'montant_theorique', 'ecart', 'statut',
     ];
 
     protected $casts = [
         'montant_ouverture'  => 'decimal:2',
         'montant_fermeture'  => 'decimal:2',
+        'montant_theorique'  => 'decimal:2',
+        'ecart'              => 'decimal:2',
         'date_ouverture'     => 'datetime',
         'date_fermeture'     => 'datetime',
     ];

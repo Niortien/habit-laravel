@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\ConflictException;
 use App\Exceptions\NotFoundException;
 use App\Http\Traits\ApiResponse;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -75,7 +76,7 @@ class UserController extends Controller
         $data = $request->validate([
             'email'      => 'required|email',
             'password'   => 'required|string|min:8',
-            'role'       => 'sometimes|in:ADMIN,VENDEUR',
+            'role'       => 'sometimes|in:ADMIN,VENDEUR,GERANT',
             'boutiqueId' => 'sometimes|nullable|uuid|exists:boutiques,id',
         ]);
 
@@ -89,6 +90,8 @@ class UserController extends Controller
             'role'         => $data['role'] ?? 'VENDEUR',
             'boutique_id'  => $data['boutiqueId'] ?? null,
         ]);
+
+        AuditLog::record($request->user()->id, 'USER_CREATE', 'User', $user->id, "Création utilisateur {$user->email} ({$user->role})");
 
         return $this->success($user, 201);
     }
@@ -120,7 +123,7 @@ class UserController extends Controller
         $data = $request->validate([
             'email'      => 'sometimes|email',
             'password'   => 'sometimes|string|min:8',
-            'role'       => 'sometimes|in:ADMIN,VENDEUR',
+            'role'       => 'sometimes|in:ADMIN,VENDEUR,GERANT',
             'boutiqueId' => 'sometimes|nullable|uuid',
         ]);
 
@@ -131,6 +134,7 @@ class UserController extends Controller
         if (isset($data['password']))   $update['password_hash'] = Hash::make($data['password']);
 
         $user->update($update);
+        AuditLog::record($request->user()->id, 'USER_UPDATE', 'User', $user->id, "Modification utilisateur {$user->email}");
         return $this->success($user->fresh());
     }
 
@@ -145,11 +149,12 @@ class UserController extends Controller
      *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $user = User::find($id);
         if (!$user) throw new NotFoundException('Utilisateur introuvable', 'USER_NOT_FOUND');
         $user->delete();
+        AuditLog::record($request->user()->id, 'USER_DESTROY', 'User', $id, "Suppression utilisateur {$user->email}");
         return $this->success($user);
     }
 }

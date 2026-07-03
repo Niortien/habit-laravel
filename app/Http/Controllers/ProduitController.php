@@ -219,6 +219,18 @@ class ProduitController extends Controller
             if (array_key_exists($from, $data)) $update[$to] = $data[$from];
         }
 
+        if (array_key_exists('prix_vente', $update) && (string) $update['prix_vente'] !== (string) $produit->prix_vente
+            || array_key_exists('prix_achat', $update) && (string) $update['prix_achat'] !== (string) $produit->prix_achat) {
+            \App\Models\AuditLog::record(
+                $request->user()->id,
+                'PRODUIT_PRIX_UPDATE',
+                'Produit',
+                $produit->id,
+                "Prix modifiés pour {$produit->nom} : vente {$produit->prix_vente} → " . ($update['prix_vente'] ?? $produit->prix_vente)
+                    . ", achat {$produit->prix_achat} → " . ($update['prix_achat'] ?? $produit->prix_achat)
+            );
+        }
+
         $produit->update($update);
         return $this->success($produit->fresh()->load(['categorie', 'variantes', 'images']));
     }

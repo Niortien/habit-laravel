@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ConflictException;
 use App\Exceptions\NotFoundException;
 use App\Http\Traits\ApiResponse;
+use App\Models\AuditLog;
 use App\Models\Boutique;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,7 +109,12 @@ class BoutiqueController extends Controller
             'adresse'  => 'sometimes|nullable|string',
             'ville'    => 'sometimes|nullable|string',
             'whatsapp' => 'sometimes|nullable|string',
+            'isActive' => 'sometimes|boolean',
         ]);
+        if (array_key_exists('isActive', $data)) {
+            $data['is_active'] = $data['isActive'];
+            unset($data['isActive']);
+        }
         $b->update($data);
         return $this->success($b->fresh());
     }
@@ -123,11 +130,24 @@ class BoutiqueController extends Controller
      *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $b = Boutique::find($id);
         if (!$b) throw new NotFoundException('Boutique introuvable', 'BOUTIQUE_NOT_FOUND');
+
+        $aDesDonnees = $b->entrees()->exists() || $b->sorties()->exists() || $b->caisseSessions()->exists();
+
+        if ($aDesDonnees) {
+            if (!$b->is_active) {
+                throw new ConflictException('Boutique déjà archivée', 'BOUTIQUE_ALREADY_ARCHIVED');
+            }
+            $b->update(['is_active' => false]);
+            AuditLog::record($request->user()->id, 'BOUTIQUE_ARCHIVE', 'Boutique', $b->id, "Archivage boutique {$b->nom} (données historiques conservées)");
+            return $this->success($b->fresh());
+        }
+
         $b->delete();
+        AuditLog::record($request->user()->id, 'BOUTIQUE_DESTROY', 'Boutique', $id, "Suppression boutique {$b->nom}");
         return $this->success($b);
     }
 }

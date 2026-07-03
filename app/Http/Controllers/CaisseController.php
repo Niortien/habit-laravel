@@ -103,11 +103,29 @@ class CaisseController extends Controller
 
         $data = $request->validate(['montantFermeture' => 'required|numeric|min:0']);
 
+        // Écart = espèces déclarées à la fermeture vs. théorique (fond de caisse + ventes cash de la session).
+        // Seules les transactions CASH sont comparables au tiroir physique (mobile money / carte n'y transitent pas).
+        $totalCash = $session->transactions->where('mode_paiement', 'CASH')->sum('montant');
+        $montantTheorique = bcadd((string) $session->montant_ouverture, (string) $totalCash, 2);
+        $ecart = bcsub((string) $data['montantFermeture'], $montantTheorique, 2);
+
         $session->update([
             'statut'            => 'FERMEE',
             'date_fermeture'    => now(),
             'montant_fermeture' => $data['montantFermeture'],
+            'montant_theorique' => $montantTheorique,
+            'ecart'             => $ecart,
         ]);
+
+        if (bccomp($ecart, '0', 2) !== 0) {
+            \App\Models\AuditLog::record(
+                $request->user()->id,
+                'CAISSE_ECART',
+                'CaisseSession',
+                $session->id,
+                "Écart de caisse à la fermeture : {$ecart} (théorique {$montantTheorique}, déclaré {$data['montantFermeture']})"
+            );
+        }
 
         return $this->success($session->fresh()->load('transactions'));
     }

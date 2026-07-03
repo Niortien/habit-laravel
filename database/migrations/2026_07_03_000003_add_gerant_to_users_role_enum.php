@@ -8,12 +8,12 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() !== 'mysql') return;
-        DB::statement("ALTER TABLE sorties MODIFY COLUMN type ENUM('VENTE', 'PERTE', 'DON', 'RETOUR_FOURNISSEUR', 'DEPENSE') NOT NULL");
+        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('ADMIN', 'VENDEUR', 'GERANT') NOT NULL DEFAULT 'VENDEUR'");
     }
 
     public function down(): void
     {
         if (DB::getDriverName() !== 'mysql') return;
-        DB::statement("ALTER TABLE sorties MODIFY COLUMN type ENUM('VENTE', 'PERTE', 'DON', 'RETOUR_FOURNISSEUR') NOT NULL");
+        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('ADMIN', 'VENDEUR') NOT NULL DEFAULT 'VENDEUR'");
     }
 };

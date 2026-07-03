@@ -10,6 +10,8 @@ use App\Models\Variante;
 use App\Services\StockMovementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 
 
@@ -102,5 +104,66 @@ class StockController extends Controller
         $data  = $q->skip(($page - 1) * $limit)->take($limit)->get();
 
         return $this->paginated($data, $total, $page, $limit);
+    }
+
+    /**
+     * @OA\Post(path="/stock/transferts", tags={"Stock"}, summary="Transférer du stock d'une boutique à une autre", security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"varianteId","boutiqueDestinationId","quantite"},
+     *             @OA\Property(property="varianteId", type="string", format="uuid"),
+     *             @OA\Property(property="boutiqueDestinationId", type="string", format="uuid"),
+     *             @OA\Property(property="quantite", type="integer")
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Transfert effectué", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=409, description="Stock insuffisant", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function transferer(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'varianteId'            => 'required|uuid|exists:variantes,id',
+            'boutiqueDestinationId' => 'required|uuid|exists:boutiques,id',
+            'quantite'              => 'required|integer|min:1',
+        ]);
+
+        $source = Variante::findOrFail($data['varianteId']);
+
+        if ($source->boutique_id === $data['boutiqueDestinationId']) {
+            throw new DomainException(
+                'La boutique de destination doit être différente de la boutique source',
+                422,
+                'TRANSFERT_MEME_BOUTIQUE'
+            );
+        }
+
+        $userId    = $request->user()->id;
+        $reference = 'TRF-' . strtoupper(Str::random(8));
+
+        $destination = DB::transaction(function () use ($source, $data, $userId, $reference) {
+            $destination = Variante::firstOrCreate(
+                [
+                    'produit_id'  => $source->produit_id,
+                    'boutique_id' => $data['boutiqueDestinationId'],
+                    'taille'      => $source->taille,
+                    'couleur'     => $source->couleur,
+                ],
+                [
+                    'quantite_stock' => 0,
+                    'seuil_alerte'   => $source->seuil_alerte,
+                ]
+            );
+
+            $this->movements->create($source->id, 'SORTIE', $data['quantite'], $userId, "Transfert {$reference} vers boutique {$data['boutiqueDestinationId']}", null, $reference);
+            $this->movements->create($destination->id, 'ENTREE', $data['quantite'], $userId, "Transfert {$reference} depuis boutique {$source->boutique_id}", $reference, null);
+
+            return $destination;
+        });
+
+        return $this->success([
+            'reference'   => $reference,
+            'source'      => $source->fresh(),
+            'destination' => $destination->fresh(),
+        ], 201);
     }
 }

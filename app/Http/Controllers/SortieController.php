@@ -182,6 +182,8 @@ class SortieController extends Controller
             $sortie->delete();
         });
 
+        \App\Models\AuditLog::record($userId, 'SORTIE_DESTROY', 'Sortie', $sortie->id, 'Suppression sortie ' . $sortie->reference);
+
         return $this->success($sortie);
     }
 
@@ -201,6 +203,8 @@ class SortieController extends Controller
             }
             $sortie->update(['notes' => '[ANNULÉE] ' . ($sortie->notes ?? '')]);
         });
+
+        \App\Models\AuditLog::record($userId, 'SORTIE_ANNULER', 'Sortie', $sortie->id, 'Annulation sortie ' . $sortie->reference);
 
         return $this->success($sortie->fresh()->load(['lignes.variante.produit', 'user', 'boutique', 'transaction']));
     }

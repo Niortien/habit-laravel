@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 
@@ -130,5 +131,62 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return $this->success($request->user());
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/auth/forgot-password",
+     *     tags={"Auth"},
+     *     summary="Demander un lien de réinitialisation de mot de passe",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(required={"email"}, @OA\Property(property="email", type="string", format="email"))),
+     *     @OA\Response(response=200, description="Lien envoyé si le compte existe", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => 'required|email']);
+
+        // Réponse générique dans tous les cas pour ne pas révéler si l'email existe.
+        Password::sendResetLink($request->only('email'));
+
+        return $this->success(['message' => 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.']);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/auth/reset-password",
+     *     tags={"Auth"},
+     *     summary="Réinitialiser le mot de passe avec un token",
+     *     @OA\RequestBody(required=true,
+     *         @OA\JsonContent(required={"email","token","password"},
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="token", type="string"),
+     *             @OA\Property(property="password", type="string", minLength=8)
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Mot de passe réinitialisé", @OA\JsonContent(ref="#/components/schemas/ApiResponse")),
+     *     @OA\Response(response=422, description="Token invalide ou expiré", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
+     * )
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email'    => 'required|email',
+            'token'    => 'required|string',
+            'password' => 'required|string|min:8',
+        ]);
+
+        $status = Password::reset(
+            $data,
+            function (User $user, string $password) {
+                $user->forceFill(['password_hash' => Hash::make($password)])->save();
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw new ValidationException(__($status), 'PASSWORD_RESET_FAILED');
+        }
+
+        return $this->success(['message' => 'Mot de passe réinitialisé avec succès.']);
     }
 }
