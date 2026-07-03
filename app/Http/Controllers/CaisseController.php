@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\ConflictException;
 use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
 use App\Http\Traits\ApiResponse;
 use App\Models\CaisseSession;
 use App\Models\Entree;
@@ -173,8 +174,12 @@ class CaisseController extends Controller
 
         $boutiqueId = $this->boutiqueId($request, $request->query('boutiqueId'));
 
+        if (!$boutiqueId && $request->user()->role === 'ADMIN') {
+            throw new ValidationException('boutiqueId requis pour un administrateur', 'BOUTIQUE_ID_REQUIRED');
+        }
+
         $active = CaisseSession::where('statut', 'OUVERTE')
-            ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+            ->where('boutique_id', $boutiqueId)
             ->orderBy('date_ouverture', 'desc')
             ->first();
 
