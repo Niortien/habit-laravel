@@ -229,8 +229,15 @@ class CaisseController extends Controller
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
             ->sum('total_cout');
 
-        $totalVentes = number_format((float) $totaux->totalVentes, 2, '.', '');
-        $totalAchats = number_format((float) $totalAchats, 2, '.', '');
+        $totalDepenses = (string) \Illuminate\Support\Facades\DB::table('sorties')
+            ->where('type', 'DEPENSE')
+            ->where('created_at', '>=', $todayStart)
+            ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+            ->sum('total_montant');
+
+        $totalVentes   = number_format((float) $totaux->totalVentes, 2, '.', '');
+        $totalAchats   = number_format((float) $totalAchats, 2, '.', '');
+        $totalDepenses = number_format((float) $totalDepenses, 2, '.', '');
 
         $session = CaisseSession::where('statut', 'OUVERTE')
             ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
@@ -247,7 +254,9 @@ class CaisseController extends Controller
             'totalVentes'       => $totalVentes,
             'totalTransactions' => (int) $totaux->totalTransactions,
             'totalAchats'       => $totalAchats,
+            'totalDepenses'     => $totalDepenses,
             'beneficeNet'       => number_format((float) $totalVentes - (float) $totalAchats, 2, '.', ''),
+            'montantADeposer'   => number_format((float) $totalVentes - (float) $totalDepenses, 2, '.', ''),
             'parModePaiement'   => $parMode,
         ]);
     }

@@ -170,6 +170,59 @@ class RapportController extends Controller
         return $this->success($data);
     }
 
+    /**
+     * @OA\Get(path="/rapports/recette-hebdomadaire", tags={"Rapports"}, summary="Recette nette (ventes - depenses) par semaine", security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="boutiqueId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Recette par semaine", @OA\JsonContent(ref="#/components/schemas/ApiResponse"))
+     * )
+     */
+    public function recetteHebdomadaire(Request $request): JsonResponse
+    {
+        $boutiqueId = $this->boutiqueId($request);
+        $dateDebut  = $request->get('dateDebut', now()->subWeeks(11)->startOfWeek()->toDateString());
+        $dateFin    = $request->get('dateFin', now()->toDateString());
+
+        $data = Cache::remember("recette-hebdo:{$boutiqueId}:{$dateDebut}:{$dateFin}", 300, function () use ($boutiqueId, $dateDebut, $dateFin) {
+            $format = '%Y-%u';
+
+            $ventesQ = Transaction::selectRaw("DATE_FORMAT(transactions.created_at, '{$format}') as periode, SUM(transactions.montant) as total")
+                ->where('transactions.created_at', '>=', $dateDebut)
+                ->where('transactions.created_at', '<=', $dateFin . ' 23:59:59');
+            if ($boutiqueId) {
+                $ventesQ->join('caisse_sessions as cs', 'transactions.session_id', '=', 'cs.id')
+                        ->where('cs.boutique_id', $boutiqueId);
+            }
+            $ventesRaw = $ventesQ->groupBy('periode')->pluck('total', 'periode')->toArray();
+
+            $depensesRaw = Sortie::selectRaw("DATE_FORMAT(created_at, '{$format}') as periode, SUM(total_montant) as total")
+                ->where('type', 'DEPENSE')
+                ->where('created_at', '>=', $dateDebut)
+                ->where('created_at', '<=', $dateFin . ' 23:59:59')
+                ->when($boutiqueId, fn($q) => $q->where('boutique_id', $boutiqueId))
+                ->groupBy('periode')
+                ->pluck('total', 'periode')
+                ->toArray();
+
+            $periodes = array_unique(array_merge(array_keys($ventesRaw), array_keys($depensesRaw)));
+            sort($periodes);
+
+            return array_values(array_map(function ($periode) use ($ventesRaw, $depensesRaw) {
+                $ventes   = (float) ($ventesRaw[$periode] ?? 0);
+                $depenses = (float) ($depensesRaw[$periode] ?? 0);
+                return [
+                    'semaine'       => $periode,
+                    'totalVentes'   => number_format($ventes, 2, '.', ''),
+                    'totalDepenses' => number_format($depenses, 2, '.', ''),
+                    'recetteNette'  => number_format($ventes - $depenses, 2, '.', ''),
+                ];
+            }, $periodes));
+        });
+
+        return $this->success($data);
+    }
+
     public function fluxTresorerie(Request $request): JsonResponse
     {
         $boutiqueId = $this->boutiqueId($request);
