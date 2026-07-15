@@ -75,6 +75,27 @@ class LookbookPhotoController extends Controller
         return $this->success($photo->fresh());
     }
 
+    public function updatePubliee(Request $request, string $id): JsonResponse
+    {
+        $photo = LookbookPhoto::find($id);
+        if (!$photo) throw new NotFoundException('Photo introuvable', 'LOOKBOOK_PHOTO_NOT_FOUND');
+
+        $data = $request->validate(['publiee' => 'required|boolean']);
+        $photo->update(['publiee' => $data['publiee']]);
+
+        return $this->success($photo->fresh());
+    }
+
+    public function publicIndex(): JsonResponse
+    {
+        $data = LookbookPhoto::where('publiee', true)
+            ->orderBy('created_at', 'desc')
+            ->limit(12)
+            ->get(['id', 'url', 'nom', 'created_at']);
+
+        return $this->success($data);
+    }
+
     public function destroy(string $id): JsonResponse
     {
         $photo = LookbookPhoto::find($id);

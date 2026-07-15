@@ -10,7 +10,9 @@ class LookbookPhoto extends Model
     protected $keyType = 'string';
     public $incrementing = false;
 
-    protected $fillable = ['url', 'nom', 'telephone', 'message', 'statut'];
+    protected $fillable = ['url', 'nom', 'telephone', 'message', 'statut', 'publiee'];
+
+    protected $casts = ['publiee' => 'boolean'];
 
     protected static function boot(): void
     {

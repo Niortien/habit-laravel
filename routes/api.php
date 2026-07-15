@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
 
     // ── Lookbook (upload photo client, public) ─────────────────────────────
     Route::post('lookbook-photos', [LookbookPhotoController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('lookbook-photos/publiees', [LookbookPhotoController::class, 'publicIndex']);
 
     // ── Protected routes ───────────────────────────────────────────────────
     Route::middleware('auth:api')->group(function () {
@@ -106,9 +107,10 @@ Route::prefix('v1')->group(function () {
             Route::post('stock/transferts', [StockController::class, 'transferer']);
 
             // Photos clients (lookbook)
-            Route::get('lookbook-photos',         [LookbookPhotoController::class, 'index']);
-            Route::patch('lookbook-photos/{id}',  [LookbookPhotoController::class, 'updateStatut']);
-            Route::delete('lookbook-photos/{id}', [LookbookPhotoController::class, 'destroy']);
+            Route::get('lookbook-photos',            [LookbookPhotoController::class, 'index']);
+            Route::patch('lookbook-photos/{id}',     [LookbookPhotoController::class, 'updateStatut']);
+            Route::patch('lookbook-photos/{id}/publier', [LookbookPhotoController::class, 'updatePubliee']);
+            Route::delete('lookbook-photos/{id}',    [LookbookPhotoController::class, 'destroy']);
         });
 
         // ── Admin-only ──────────────────────────────────────────────────────
