@@ -51,7 +51,6 @@ Route::prefix('v1')->group(function () {
         // Variantes
         Route::patch('variantes/{id}',       [VarianteController::class, 'update']);
         Route::delete('variantes/{id}',      [VarianteController::class, 'destroy']);
-        Route::patch('variantes/{id}/stock', [VarianteController::class, 'adjustStock']);
 
         // Stock
         Route::get('stock',           [StockController::class, 'index']);
@@ -132,6 +131,9 @@ Route::prefix('v1')->group(function () {
             Route::post('boutiques',        [BoutiqueController::class, 'store']);
             Route::patch('boutiques/{id}',  [BoutiqueController::class, 'update']);
             Route::delete('boutiques/{id}', [BoutiqueController::class, 'destroy']);
+
+            // Ajustement manuel de stock (+/-) — réservé ADMIN
+            Route::patch('variantes/{id}/stock', [VarianteController::class, 'adjustStock']);
 
             // Annulation / suppression de mouvements comptables — réservé ADMIN
             Route::delete('entrees/{id}',        [EntreeController::class, 'destroy']);
