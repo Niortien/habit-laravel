@@ -7,6 +7,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CaisseController;
 use App\Http\Controllers\EntreeController;
 use App\Http\Controllers\FournisseurController;
+use App\Http\Controllers\LookbookPhotoController;
 use App\Http\Controllers\ProduitController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\SortieController;
@@ -27,6 +28,9 @@ Route::prefix('v1')->group(function () {
     Route::get('produits/categories', [ProduitController::class, 'categories']);
     Route::get('produits',            [ProduitController::class, 'index']);
     Route::get('produits/{id}',      [ProduitController::class, 'show']);
+
+    // ── Lookbook (upload photo client, public) ─────────────────────────────
+    Route::post('lookbook-photos', [LookbookPhotoController::class, 'store'])->middleware('throttle:10,1');
 
     // ── Protected routes ───────────────────────────────────────────────────
     Route::middleware('auth:api')->group(function () {
@@ -100,6 +104,11 @@ Route::prefix('v1')->group(function () {
             Route::delete('fournisseurs/{id}', [FournisseurController::class, 'destroy']);
 
             Route::post('stock/transferts', [StockController::class, 'transferer']);
+
+            // Photos clients (lookbook)
+            Route::get('lookbook-photos',         [LookbookPhotoController::class, 'index']);
+            Route::patch('lookbook-photos/{id}',  [LookbookPhotoController::class, 'updateStatut']);
+            Route::delete('lookbook-photos/{id}', [LookbookPhotoController::class, 'destroy']);
         });
 
         // ── Admin-only ──────────────────────────────────────────────────────
