@@ -7,6 +7,7 @@ use App\Exceptions\NotFoundException;
 use App\Http\Traits\ApiResponse;
 use App\Models\Variante;
 use App\Services\StockMovementService;
+use App\Support\ProduitCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -51,6 +52,7 @@ class VarianteController extends Controller
         }
 
         $variante->update($update);
+        ProduitCache::bump();
         return $this->success($variante->fresh()->load('produit'));
     }
 
@@ -67,6 +69,7 @@ class VarianteController extends Controller
         }
 
         $variante->delete();
+        ProduitCache::bump();
         return $this->success($variante);
     }
 
@@ -88,6 +91,7 @@ class VarianteController extends Controller
             $id, $type, $quantite, $request->user()->id, $data['motif'] ?? null
         );
 
+        ProduitCache::bump();
         return $this->success($mouvement->load('variante'));
     }
 }

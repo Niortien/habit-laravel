@@ -10,6 +10,7 @@ use App\Models\Produit;
 use App\Models\ProduitImage;
 use App\Models\Variante;
 use App\Services\CloudinaryService;
+use App\Support\ProduitCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -47,21 +48,27 @@ class ProduitController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $q = Produit::with(['categorie', 'variantes', 'images'])->where('is_actif', true);
+        $key = ProduitCache::keyIndex($request->getQueryString());
 
-        if ($request->filled('categorieId')) $q->where('categorie_id', $request->categorieId);
-        if ($request->filled('search'))       $q->where('nom', 'like', '%' . $request->search . '%');
-        if ($request->filled('enPromo'))      $q->where('en_promo', filter_var($request->enPromo, FILTER_VALIDATE_BOOLEAN));
-        if ($request->filled('boutiqueId')) {
-            $q->whereHas('variantes', fn($v) => $v->where('boutique_id', $request->boutiqueId));
-        }
+        $payload = Cache::remember($key, 60, function () use ($request) {
+            $q = Produit::with(['categorie', 'variantes', 'images'])->where('is_actif', true);
 
-        $page  = max(1, (int) $request->get('page', 1));
-        $limit = min(200, max(1, (int) $request->get('limit', 20)));
-        $total = $q->count();
-        $data  = $q->skip(($page - 1) * $limit)->take($limit)->orderBy('created_at', 'desc')->get();
+            if ($request->filled('categorieId')) $q->where('categorie_id', $request->categorieId);
+            if ($request->filled('search'))       $q->where('nom', 'like', '%' . $request->search . '%');
+            if ($request->filled('enPromo'))      $q->where('en_promo', filter_var($request->enPromo, FILTER_VALIDATE_BOOLEAN));
+            if ($request->filled('boutiqueId')) {
+                $q->whereHas('variantes', fn($v) => $v->where('boutique_id', $request->boutiqueId));
+            }
 
-        return $this->paginated($data, $total, $page, $limit);
+            $page  = max(1, (int) $request->get('page', 1));
+            $limit = min(200, max(1, (int) $request->get('limit', 20)));
+            $total = $q->count();
+            $data  = $q->skip(($page - 1) * $limit)->take($limit)->orderBy('created_at', 'desc')->get();
+
+            return ['data' => $data, 'total' => $total, 'page' => $page, 'limit' => $limit];
+        });
+
+        return $this->paginated($payload['data'], $payload['total'], $payload['page'], $payload['limit']);
     }
 
     /**
@@ -73,7 +80,11 @@ class ProduitController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $p = Produit::with(['categorie', 'variantes', 'images'])->find($id);
+        $p = Cache::remember(
+            ProduitCache::keyShow($id),
+            120,
+            fn () => Produit::with(['categorie', 'variantes', 'images'])->find($id)
+        );
         if (!$p) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
         return $this->success($p);
     }
@@ -170,6 +181,7 @@ class ProduitController extends Controller
             }
         }
 
+        ProduitCache::bump();
         return $this->success($produit->load(['categorie', 'variantes', 'images']), 201);
     }
 
@@ -232,6 +244,7 @@ class ProduitController extends Controller
         }
 
         $produit->update($update);
+        ProduitCache::bump();
         return $this->success($produit->fresh()->load(['categorie', 'variantes', 'images']));
     }
 
@@ -287,6 +300,7 @@ class ProduitController extends Controller
             );
         }
 
+        ProduitCache::bump();
         return $this->success([
             'movedCount' => count($deplacees),
             'conflicts'  => $conflits,
@@ -316,6 +330,7 @@ class ProduitController extends Controller
             'seuil_alerte'   => $data['seuilAlerte'] ?? 5,
         ]);
 
+        ProduitCache::bump();
         return $this->success($variante, 201);
     }
 
@@ -331,6 +346,7 @@ class ProduitController extends Controller
         $produit = Produit::find($id);
         if (!$produit) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
         $produit->delete();
+        ProduitCache::bump();
         return $this->success(['message' => 'Produit supprimé', 'id' => $id]);
     }
 
@@ -354,6 +370,7 @@ class ProduitController extends Controller
         $ordre = ProduitImage::where('produit_id', $id)->max('ordre') + 1;
         $image = ProduitImage::create(['produit_id' => $id, 'url' => $url, 'ordre' => $ordre]);
 
+        ProduitCache::bump();
         return $this->success($image, 201);
     }
 
@@ -363,6 +380,7 @@ class ProduitController extends Controller
         if (!$image) throw new NotFoundException('Image introuvable', 'IMAGE_NOT_FOUND');
         $this->cloudinary->deleteByUrl($image->url);
         $image->delete();
+        ProduitCache::bump();
         return $this->success($image);
     }
 
