@@ -51,7 +51,7 @@ class ProduitController extends Controller
         $key = ProduitCache::keyIndex($request->getQueryString());
 
         $payload = Cache::remember($key, 60, function () use ($request) {
-            $q = Produit::with(['categorie', 'variantes', 'images'])->where('is_actif', true);
+            $q = Produit::with(['categorie', 'variantes.boutique', 'images'])->where('is_actif', true);
 
             if ($request->filled('categorieId')) $q->where('categorie_id', $request->categorieId);
             if ($request->filled('search'))       $q->where('nom', 'like', '%' . $request->search . '%');
@@ -83,7 +83,7 @@ class ProduitController extends Controller
         $p = Cache::remember(
             ProduitCache::keyShow($id),
             120,
-            fn () => Produit::with(['categorie', 'variantes', 'images'])->find($id)
+            fn () => Produit::with(['categorie', 'variantes.boutique', 'images'])->find($id)
         );
         if (!$p) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
         return $this->success($p);
