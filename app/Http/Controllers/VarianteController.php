@@ -91,6 +91,8 @@ class VarianteController extends Controller
             $id, $type, $quantite, $request->user()->id, $data['motif'] ?? null
         );
 
+        \App\Models\AuditLog::record($request->user()->id, 'STOCK_AJUSTEMENT', 'Variante', $id, 'Ajustement de stock ' . ($variation >= 0 ? '+' : '') . $variation . ' (' . $variante->taille . ' / ' . $variante->couleur . ')' . (!empty($data['motif']) ? ' — ' . $data['motif'] : ''));
+
         ProduitCache::bump();
         return $this->success($mouvement->load('variante'));
     }

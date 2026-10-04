@@ -107,6 +107,8 @@ class SortieController extends Controller
                 'boutique_id'        => $boutiqueId,
             ]);
 
+            \App\Models\AuditLog::record($userId, 'DEPENSE_CREATE', 'Sortie', $sortie->id, 'Dépense ' . $sortie->reference . ' : ' . number_format((float) $sortie->total_montant, 0, ',', ' ') . ' FCFA' . (!empty($data['notes']) ? ' — ' . $data['notes'] : ''));
+
             return $this->success($sortie->load(['user', 'boutique']), 201);
         }
 
@@ -155,6 +157,9 @@ class SortieController extends Controller
 
             return $sortie;
         });
+
+        $nbArticles = (int) $sortie->lignes()->sum('quantite');
+        \App\Models\AuditLog::record($userId, 'SORTIE_CREATE', 'Sortie', $sortie->id, ($sortie->type === 'VENTE' ? 'Vente ' : 'Sortie ' . $sortie->type . ' ') . $sortie->reference . ' : ' . number_format((float) $sortie->total_montant, 0, ',', ' ') . ' FCFA (' . $nbArticles . ' article(s))');
 
         return $this->success($sortie->load(['lignes.variante.produit', 'user', 'boutique', 'transaction']), 201);
     }

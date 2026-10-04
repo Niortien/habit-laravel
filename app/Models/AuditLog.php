@@ -26,12 +26,17 @@ class AuditLog extends Model
 
     public static function record(?string $userId, string $action, string $entityType, ?string $entityId = null, ?string $description = null): void
     {
-        static::create([
-            'user_id'     => $userId,
-            'action'      => $action,
-            'entity_type' => $entityType,
-            'entity_id'   => $entityId,
-            'description' => $description,
-        ]);
+        try {
+            static::create([
+                'user_id'     => $userId,
+                'action'      => $action,
+                'entity_type' => $entityType,
+                'entity_id'   => $entityId,
+                'description' => $description,
+            ]);
+        } catch (\Throwable $e) {
+            // Un incident du journal ne doit jamais bloquer une vente, une entrée ou une connexion.
+            report($e);
+        }
     }
 }

@@ -156,6 +156,8 @@ class EntreeController extends Controller
             return $entree;
         });
 
+        \App\Models\AuditLog::record($userId, 'ENTREE_CREATE', 'Entree', $entree->id, 'Entrée ' . $entree->reference . ' (' . ($entree->fournisseur ?? 'fournisseur inconnu') . ') : ' . number_format((float) $totalCout, 0, ',', ' ') . ' FCFA');
+
         return $this->success($entree->load(['lignes.variante.produit', 'user', 'boutique']), 201);
     }
 

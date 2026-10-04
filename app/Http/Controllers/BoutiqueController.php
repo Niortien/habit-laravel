@@ -77,7 +77,9 @@ class BoutiqueController extends Controller
             'ville'    => 'sometimes|nullable|string',
             'whatsapp' => 'sometimes|nullable|string',
         ]);
-        return $this->success(Boutique::create($data), 201);
+        $boutique = Boutique::create($data);
+        AuditLog::record($request->user()->id, 'BOUTIQUE_CREATE', 'Boutique', $boutique->id, "Création de la boutique {$boutique->nom}");
+        return $this->success($boutique, 201);
     }
 
     /**
@@ -116,6 +118,7 @@ class BoutiqueController extends Controller
             unset($data['isActive']);
         }
         $b->update($data);
+        AuditLog::record($request->user()->id, 'BOUTIQUE_UPDATE', 'Boutique', $b->id, "Modification de la boutique {$b->nom}");
         return $this->success($b->fresh());
     }
 

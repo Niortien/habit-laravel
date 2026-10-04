@@ -22,10 +22,12 @@ class AuditLogController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $q = AuditLog::with('user')->orderBy('created_at', 'desc');
+        $q = AuditLog::with('user:id,email,role,boutique_id')->orderBy('created_at', 'desc');
 
         if ($request->filled('action'))     $q->where('action', $request->action);
         if ($request->filled('entityType')) $q->where('entity_type', $request->entityType);
+        if ($request->filled('userId'))     $q->where('user_id', $request->userId);
+        if ($request->filled('search'))     $q->where('description', 'like', '%' . str_replace(['%', '_'], ['\\%', '\\_'], $request->search) . '%');
         if ($request->filled('dateDebut'))  $q->where('created_at', '>=', $request->dateDebut);
         if ($request->filled('dateFin'))    $q->where('created_at', '<=', $request->dateFin);
 

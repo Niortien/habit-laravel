@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\ConflictException;
 use App\Exceptions\ValidationException;
 use App\Http\Traits\ApiResponse;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,10 +54,12 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password_hash)) {
+            AuditLog::record($user?->id, 'LOGIN_ECHEC', 'User', $user?->id, "Échec de connexion pour {$request->email}");
             throw new ValidationException('Identifiants invalides', 'AUTH_INVALID_CREDENTIALS');
         }
 
         $user->load('boutique');
+        AuditLog::record($user->id, 'LOGIN', 'User', $user->id, "Connexion de {$user->email}");
 
         $accessToken = JWTAuth::fromUser($user);
 
