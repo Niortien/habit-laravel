@@ -13,7 +13,9 @@ class AuditLogController extends Controller
 
     /**
      * @OA\Get(path="/audit-logs", tags={"Audit"}, summary="Journal des actions sensibles (ADMIN)", security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="action", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="action", in="query", description="Un ou plusieurs codes séparés par des virgules", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="userId", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="search", in="query", description="Texte recherché dans la description", @OA\Schema(type="string")),
      *     @OA\Parameter(name="entityType", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="dateDebut", in="query", @OA\Schema(type="string", format="date")),
      *     @OA\Parameter(name="dateFin", in="query", @OA\Schema(type="string", format="date")),
@@ -24,7 +26,7 @@ class AuditLogController extends Controller
     {
         $q = AuditLog::with('user:id,email,role,boutique_id')->orderBy('created_at', 'desc');
 
-        if ($request->filled('action'))     $q->where('action', $request->action);
+        if ($request->filled('action'))     $q->whereIn('action', array_filter(explode(',', (string) $request->action)));
         if ($request->filled('entityType')) $q->where('entity_type', $request->entityType);
         if ($request->filled('userId'))     $q->where('user_id', $request->userId);
         if ($request->filled('search'))     $q->where('description', 'like', '%' . str_replace(['%', '_'], ['\\%', '\\_'], $request->search) . '%');
