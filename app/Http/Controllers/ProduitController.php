@@ -181,6 +181,8 @@ class ProduitController extends Controller
             }
         }
 
+        \App\Models\AuditLog::record($request->user()->id, 'PRODUIT_CREATE', 'Produit', $produit->id, 'Création du produit ' . $produit->nom);
+
         ProduitCache::bump();
         return $this->success($produit->load(['categorie', 'variantes', 'images']), 201);
     }
@@ -300,6 +302,8 @@ class ProduitController extends Controller
             );
         }
 
+        \App\Models\AuditLog::record($request->user()->id, 'PRODUIT_UPDATE', 'Produit', $produit->id, 'Modification du produit ' . $produit->nom);
+
         ProduitCache::bump();
         return $this->success([
             'movedCount' => count($deplacees),
@@ -341,11 +345,12 @@ class ProduitController extends Controller
      *     @OA\Response(response=404, description="Introuvable", @OA\JsonContent(ref="#/components/schemas/ErrorResponse"))
      * )
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $produit = Produit::find($id);
         if (!$produit) throw new NotFoundException('Produit introuvable', 'PRODUIT_NOT_FOUND');
         $produit->delete();
+        \App\Models\AuditLog::record($request->user()->id, 'PRODUIT_DESTROY', 'Produit', $id, 'Suppression du produit ' . $produit->nom);
         ProduitCache::bump();
         return $this->success(['message' => 'Produit supprimé', 'id' => $id]);
     }

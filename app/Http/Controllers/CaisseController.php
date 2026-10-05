@@ -91,6 +91,8 @@ class CaisseController extends Controller
             'statut'            => 'OUVERTE',
         ]);
 
+        \App\Models\AuditLog::record($userId, 'CAISSE_OUVERTURE', 'CaisseSession', $session->id, 'Ouverture de caisse, fond de caisse ' . number_format((float) ($data['montantOuverture'] ?? 0), 0, ',', ' ') . ' FCFA');
+
         return $this->success($session->load(['user', 'boutique']), 201);
     }
 
@@ -127,6 +129,8 @@ class CaisseController extends Controller
                 "Écart de caisse à la fermeture : {$ecart} (théorique {$montantTheorique}, déclaré {$data['montantFermeture']})"
             );
         }
+
+        \App\Models\AuditLog::record($request->user()->id, 'CAISSE_FERMETURE', 'CaisseSession', $session->id, 'Fermeture de caisse, montant déclaré ' . number_format((float) $data['montantFermeture'], 0, ',', ' ') . ' FCFA');
 
         return $this->success($session->fresh()->load('transactions'));
     }

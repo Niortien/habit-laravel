@@ -52,6 +52,7 @@ class CategorieController extends Controller
         ]);
 
         Cache::forget('categories.all');
+        \App\Models\AuditLog::record($request->user()->id, 'CATEGORIE_CREATE', 'Categorie', $categorie->id, 'Création de la catégorie ' . $categorie->nom);
 
         return $this->success($categorie, 201);
     }
@@ -82,11 +83,12 @@ class CategorieController extends Controller
 
         $categorie->update($data);
         Cache::forget('categories.all');
+        \App\Models\AuditLog::record($request->user()->id, 'CATEGORIE_UPDATE', 'Categorie', $categorie->id, 'Modification de la catégorie ' . $categorie->nom);
 
         return $this->success($categorie->fresh());
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $categorie = Categorie::find($id);
         if (!$categorie) throw new NotFoundException('Catégorie introuvable', 'CATEGORIE_NOT_FOUND');
@@ -99,6 +101,7 @@ class CategorieController extends Controller
         }
 
         $categorie->delete();
+        \App\Models\AuditLog::record($request->user()->id, 'CATEGORIE_DESTROY', 'Categorie', $id, 'Suppression de la catégorie ' . $categorie->nom);
         Cache::forget('categories.all');
 
         return $this->success($categorie);
