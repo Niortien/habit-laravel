@@ -104,6 +104,10 @@ jobs:
             if [ -f deploy.php ]; then
               mv deploy.php ../deploy.php.desactive
             fi
+            # Ancien webhook de déploiement (remplacé par ce job SSH) : il lançait db:seed --force
+            if [ -f public/deploy.php ]; then
+              mv public/deploy.php ../deploy-public.php.desactive
+            fi
             git pull origin main || { [ ! -f .htaccess ] && [ -f .htaccess.avant-public.bak ] && mv .htaccess.avant-public.bak .htaccess; }
             HOME=/home/u526846542 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
             php artisan migrate --force
