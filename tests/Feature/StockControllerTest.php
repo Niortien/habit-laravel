@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Produit;
 use App\Models\Variante;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -32,8 +31,7 @@ class StockControllerTest extends TestCase
         Variante::factory()->count(2)->create();
 
         // Variante orpheline : produit_id inexistant, insertion en bypass FK
-        Schema::disableForeignKeyConstraints();
-        \Illuminate\Support\Facades\DB::table('variantes')->insert([
+        $this->insertSansCleEtrangere('variantes', [
             'id'             => (string) Str::uuid(),
             'produit_id'     => (string) Str::uuid(),
             'boutique_id'    => null,
@@ -44,7 +42,6 @@ class StockControllerTest extends TestCase
             'created_at'     => now(),
             'updated_at'     => now(),
         ]);
-        Schema::enableForeignKeyConstraints();
 
         $this->getJson('/api/v1/stock')
             ->assertStatus(200)
@@ -84,8 +81,7 @@ class StockControllerTest extends TestCase
 
         Variante::factory()->enAlerte()->create();
 
-        Schema::disableForeignKeyConstraints();
-        \Illuminate\Support\Facades\DB::table('variantes')->insert([
+        $this->insertSansCleEtrangere('variantes', [
             'id'             => (string) Str::uuid(),
             'produit_id'     => (string) Str::uuid(),
             'boutique_id'    => null,
@@ -96,7 +92,6 @@ class StockControllerTest extends TestCase
             'created_at'     => now(),
             'updated_at'     => now(),
         ]);
-        Schema::enableForeignKeyConstraints();
 
         $this->getJson('/api/v1/stock/alertes')
             ->assertStatus(200)
