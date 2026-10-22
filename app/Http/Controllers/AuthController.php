@@ -147,7 +147,8 @@ class AuthController extends Controller
      */
     public function forgotPassword(Request $request): JsonResponse
     {
-        $request->validate(['email' => 'required|email']);
+        // not_regex : aucun caractère de contrôle (injection CRLF dans les mails, GHSA-5vg9-5847-vvmq)
+        $request->validate(['email' => 'required|email|not_regex:/[\x00-\x1F\x7F]/']);
 
         // Réponse générique dans tous les cas pour ne pas révéler si l'email existe.
         Password::sendResetLink($request->only('email'));

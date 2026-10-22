@@ -74,7 +74,8 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email'      => 'required|email',
+            // not_regex : aucun caractère de contrôle (injection CRLF dans les mails, GHSA-5vg9-5847-vvmq)
+            'email'      => 'required|email|not_regex:/[\x00-\x1F\x7F]/',
             'password'   => 'required|string|min:8',
             'role'       => 'sometimes|in:ADMIN,VENDEUR,GERANT',
             'boutiqueId' => 'sometimes|nullable|uuid|exists:boutiques,id',
@@ -121,7 +122,7 @@ class UserController extends Controller
         if (!$user) throw new NotFoundException('Utilisateur introuvable', 'USER_NOT_FOUND');
 
         $data = $request->validate([
-            'email'      => 'sometimes|email',
+            'email'      => 'sometimes|email|not_regex:/[\x00-\x1F\x7F]/',
             'password'   => 'sometimes|string|min:8',
             'role'       => 'sometimes|in:ADMIN,VENDEUR,GERANT',
             'boutiqueId' => 'sometimes|nullable|uuid',
