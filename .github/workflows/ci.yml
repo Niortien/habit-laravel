@@ -108,8 +108,21 @@ jobs:
             if [ -f public/deploy.php ]; then
               mv public/deploy.php ../deploy-public.php.desactive
             fi
+            # Copie de secours de vendor/ : si composer échoue, retour au commit précédent
+            # au lieu de laisser l'API avec des dépendances à moitié installées.
+            PREV=$(git rev-parse HEAD)
+            rm -rf ../vendor.avant-deploy
+            if [ -d vendor ]; then cp -a vendor ../vendor.avant-deploy; fi
             git pull origin main || { [ ! -f .htaccess ] && [ -f .htaccess.avant-public.bak ] && mv .htaccess.avant-public.bak .htaccess; }
-            HOME=/home/u526846542 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+            if ! HOME=/home/u526846542 composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev; then
+              echo "ECHEC de composer install : retour au commit $PREV"
+              git reset --hard "$PREV"
+              rm -rf vendor
+              if [ -d ../vendor.avant-deploy ]; then mv ../vendor.avant-deploy vendor; fi
+              php artisan up
+              exit 1
+            fi
+            rm -rf ../vendor.avant-deploy
             php artisan migrate --force
             php artisan config:clear
             php artisan cache:clear
